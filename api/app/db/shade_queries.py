@@ -86,17 +86,15 @@ async def claim_next_job():
     )
 
 
-async def requeue_stuck_work(stuck_after_minutes: int) -> None:
+async def requeue_interrupted_work() -> None:
+    """Only one worker runs, so at its start anything left half-done was cut off by a crash or restart."""
+    # The re-run counts every cell again (finished ones count instantly), so progress restarts from zero
     await get_pool().execute(
-        "UPDATE shade_jobs SET status = 'QUEUED', started_at = NULL "
-        "WHERE status = 'RUNNING' AND started_at < now() - make_interval(mins => $1)",
-        stuck_after_minutes,
+        "UPDATE shade_jobs SET status = 'QUEUED', started_at = NULL, cells_done = 0, cells_no_data = 0 "
+        "WHERE status = 'RUNNING'"
     )
-    await get_pool().execute(
-        "UPDATE shade_cells SET status = 'PENDING' "
-        "WHERE status = 'FETCHING' AND requested_at < now() - make_interval(mins => $1)",
-        stuck_after_minutes,
-    )
+    await get_pool().execute("UPDATE shade_cells SET status = 'PENDING' WHERE status = 'FETCHING'")
+    await get_pool().execute("UPDATE osm_areas SET status = 'PENDING' WHERE status = 'FETCHING'")
 
 
 async def finish_job(job_id: UUID, status: str, error: str | None) -> None:

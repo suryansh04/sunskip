@@ -50,7 +50,7 @@ class Shade(ApiModel):
 
 
 class Exposure(ApiModel):
-    walk_meters: float
+    walk_meters: int
     walk_minutes: float
     sun_minutes: float | None = None
     sun_minutes_hot: float | None = None
@@ -73,7 +73,7 @@ class Leg(ApiModel):
     to: Place
     start_at: datetime
     end_at: datetime
-    distance_meters: float
+    distance_meters: int
     duration_seconds: int
     polyline: dict  # GeoJSON LineString
     shade_known: bool = False
@@ -194,3 +194,36 @@ class Conditions(ApiModel):
     source: dict = Field(default_factory=lambda: {"weather": "open-meteo", "air": "google-air-quality"})
     stale: bool = False
     typical: bool = False
+
+
+MAX_SIMULATED_ITEMS = 50
+
+
+class SimulatedItem(ApiModel):
+    type: Literal["TREE", "SHELTER"]
+    location: LatLng
+    height_m: float = Field(gt=0, le=30)
+    crown_radius_m: float | None = Field(default=None, gt=0, le=15)  # TREE
+    width_m: float | None = Field(default=None, gt=0, le=20)  # SHELTER
+    length_m: float | None = Field(default=None, gt=0, le=50)  # SHELTER
+    bearing_deg: float = Field(default=0, ge=0, lt=360)  # SHELTER: direction of its length
+
+    @model_validator(mode="after")
+    def needs_size(self):
+        if self.type == "TREE" and self.crown_radius_m:
+            return self
+        if self.type == "SHELTER" and self.width_m and self.length_m:
+            return self
+        raise ValueError("a TREE needs crownRadiusM; a SHELTER needs widthM and lengthM")
+
+
+class SimulateRequest(ApiModel):
+    month: int = Field(default=5, ge=1, le=12)
+    hours: tuple[int, int] = (10, 16)
+    items: list[SimulatedItem] = Field(min_length=1, max_length=MAX_SIMULATED_ITEMS)
+
+    @model_validator(mode="after")
+    def valid_hours(self):
+        if 0 <= self.hours[0] <= self.hours[1] <= 23:
+            return self
+        raise ValueError("hours must be [from, to] with 0 <= from <= to <= 23")

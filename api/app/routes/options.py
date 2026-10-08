@@ -3,7 +3,7 @@ from datetime import datetime, timedelta
 from app.conditions.report import start_of_hour
 from app.config import IST, settings
 from app.contracts.models import Leg, RouteOption, Shade
-from app.core.formulas import round_half_up
+from app.core.formulas import round_whole
 from app.db.walk_queries import find_stop_shade
 from app.routes.exposure import (
     WalkSun,
@@ -28,7 +28,7 @@ def total_sun(walk: WalkSun) -> float:
 def follow_path(leg: Leg, path: WalkPath) -> None:
     """Swaps Google's walking line for our shadier path."""
     leg.polyline = {"type": "LineString", "coordinates": [list(point) for point in path.coords]}
-    leg.distance_meters = round_half_up(path.length_m, 0)
+    leg.distance_meters = round_whole(path.length_m)
     leg.duration_seconds = round(path.length_m / settings.walk_speed_mps)
     leg.end_at = leg.start_at + timedelta(seconds=leg.duration_seconds)
 

@@ -3,3 +3,6 @@ target-version = "py312"
 
 [lint]
 select = ["E", "F", "I", "B", "UP", "RUF", "BLE"]
+
+[lint.flake8-bugbear]
+extend-immutable-calls = ["fastapi.Query"]

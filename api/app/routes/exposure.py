@@ -8,7 +8,7 @@ import numpy as np
 from app.conditions.report import start_of_hour
 from app.config import settings
 from app.contracts.models import Exposure
-from app.core.formulas import dose_weight, round_half_up
+from app.core.formulas import dose_weight, round_half_up, round_whole
 from app.core.geo import Point, line_length_m, sample_line
 from app.routes.walk import NO_SHADE_ROW, WalkPath
 from app.shade.tiles import NO_DATA, sun_bits
@@ -105,7 +105,7 @@ def to_exposure(walks: list[WalkSun], waits: list[tuple[float, datetime]] | None
     peaks = [walk.peak_feels_like_c for walk in walks if walk.peak_feels_like_c is not None]
     wait_minutes = sum(minutes for minutes, _ in waits) if waits is not None else None
     exposure = Exposure(
-        walk_meters=round_half_up(length, 0),
+        walk_meters=round_whole(length),
         walk_minutes=round_half_up(length / settings.walk_speed_mps / SECONDS_PER_MINUTE),
         wait_sun_minutes=round_half_up(wait_minutes),
         feels_like_c=max(peaks) if peaks else None,

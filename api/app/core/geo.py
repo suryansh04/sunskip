@@ -37,10 +37,21 @@ def bearing_deg(a: Point, b: Point) -> float:
     return (math.degrees(math.atan2(x, y)) + 360) % 360
 
 
-def offset_point(point: Point, east_m: float, north_m: float) -> Point:
+def meters_per_degree(lat: float) -> tuple[float, float]:
+    """(metres per degree of longitude, metres per degree of latitude) near this latitude."""
     lat_m_per_deg = math.pi * EARTH_RADIUS_M / 180
-    lng_m_per_deg = lat_m_per_deg * math.cos(math.radians(point[1]))
+    return lat_m_per_deg * math.cos(math.radians(lat)), lat_m_per_deg
+
+
+def offset_point(point: Point, east_m: float, north_m: float) -> Point:
+    lng_m_per_deg, lat_m_per_deg = meters_per_degree(point[1])
     return (point[0] + east_m / lng_m_per_deg, point[1] + north_m / lat_m_per_deg)
+
+
+def to_local_m(point: Point, origin: Point) -> tuple[float, float]:
+    """(east, north) metres from origin; accurate enough over a few hundred metres."""
+    lng_m_per_deg, lat_m_per_deg = meters_per_degree(origin[1])
+    return (point[0] - origin[0]) * lng_m_per_deg, (point[1] - origin[1]) * lat_m_per_deg
 
 
 def interpolate(a: Point, b: Point, fraction: float) -> Point:

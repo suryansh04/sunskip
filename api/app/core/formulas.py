@@ -28,3 +28,9 @@ def heat_weight(feels_like_c: float | None) -> float:
 
 def dose_weight(feels_like_c: float | None) -> float:
     return max(heat_weight(feels_like_c), MIN_DOSE_WEIGHT)
+
+
+def round_whole(value: float | None) -> int | None:
+    """Half-up rounding to a whole number, as an int (metres, walkers, scores)."""
+    rounded = round_half_up(value, 0)
+    return None if rounded is None else int(rounded)
