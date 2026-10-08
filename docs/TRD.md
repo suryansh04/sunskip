@@ -525,7 +525,7 @@ Both containers run on the same EC2 machine from **one image**:
 
 They never call each other. The `shade_jobs` table in Postgres connects them.
 
-**`requirements.txt`** (tested: installs and imports cleanly on Python 3.12; rasterio ships its own GDAL, so there are no system packages to install)
+**`requirements.txt`** (tested: installs and imports cleanly on Python 3.12; rasterio ships its own GDAL, but the slim image needs `libexpat1`, which the Dockerfile installs)
 
 ```
 fastapi==0.142.4
@@ -551,6 +551,7 @@ ruff
 FROM python:3.12-slim
 ENV PYTHONDONTWRITEBYTECODE=1 PYTHONUNBUFFERED=1
 WORKDIR /srv
+RUN apt-get update && apt-get install -y --no-install-recommends libexpat1 && rm -rf /var/lib/apt/lists/*
 COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
