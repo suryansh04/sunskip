@@ -52,15 +52,6 @@ async def find_erickshaw_zone(start: tuple[float, float], end: tuple[float, floa
     )
 
 
-async def load_segment_shade(segment_ids: list[int], month: int):
-    return await get_pool().fetch(
-        "SELECT segment_id, hour, sun_fraction, nodata_fraction FROM segment_shade "
-        "WHERE segment_id = ANY($1) AND month = $2",
-        segment_ids,
-        month,
-    )
-
-
 async def load_segments(segment_ids: list[int]):
     return await get_pool().fetch(
         "SELECT id, name, length_m, ST_AsGeoJSON(geom)::json AS geometry FROM segments WHERE id = ANY($1)",

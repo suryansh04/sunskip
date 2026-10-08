@@ -6,11 +6,11 @@ from app.contracts.models import BestSlot, BestTimeRequest, BestTimeResponse, Pl
 from app.core.errors import ApiError
 from app.core.formulas import dose_weight, round_half_up
 from app.core.sun import sun_elevations
-from app.routes.exposure import to_exposure, walk_sun
+from app.routes.exposure import LineShade, line_sun, load_line_shade, to_exposure
 from app.routes.plan import build_plan, trip_conditions
-from app.routes.walk import WalkPath, load_walk_path
 
 MAX_WINDOW = timedelta(hours=14)
+FASTEST_FIRST = 0.0  # rank by time and fare only, so Google's own route (not our cooler copy) is re-timed
 NOTE = "Bus times are not re-checked per slot."
 
 
@@ -24,25 +24,28 @@ def slot_times(request: BestTimeRequest) -> list[datetime]:
     return [start + index * step for index in range(count)]
 
 
-async def walk_paths(option: RouteOption) -> list[tuple[datetime, WalkPath]] | None:
-    """Each walk leg's start and path, or None if any walk has no shade data."""
-    walk_legs = [leg for leg in option.legs if leg.mode == "WALK"]
-    if not all(leg.shade_known for leg in walk_legs):
-        return None
+async def walk_lines(option: RouteOption) -> list[tuple[datetime, LineShade]] | None:
+    """Each walk leg's start and shade along its line, or None if any walk has no shade data."""
     month = option.depart_at.astimezone(IST).month
-    return [
-        (leg.start_at, await load_walk_path(leg.segment_ids, leg.polyline["coordinates"], month)) for leg in walk_legs
-    ]
+    lines = []
+    for leg in option.legs:
+        if leg.mode != "WALK":
+            continue
+        line = await load_line_shade(leg.polyline["coordinates"], month, settings.shade_sample_spacing_m)
+        if not leg.shade_known or line is None:
+            return None
+        lines.append((leg.start_at, line))
+    return lines
 
 
-def shade_slots(option: RouteOption, paths: list, slots: list[datetime], feels_like: dict) -> list[Slot]:
+def shade_slots(option: RouteOption, lines: list, slots: list[datetime], feels_like: dict) -> list[Slot]:
     # Waiting stays the same minutes for every slot; it's counted in the hour of the first boarding
     first_boarding = next((leg.start_at for leg in option.legs if leg.wait_seconds is not None), None)
     wait_minutes = option.exposure.wait_sun_minutes or 0
     results = []
     for slot in slots:
         offset = slot - option.depart_at
-        walks = [walk_sun(path, start_at + offset, feels_like) for start_at, path in paths]
+        walks = [line_sun(line, start_at + offset, feels_like) for start_at, line in lines]
         waits = [(wait_minutes, first_boarding + offset)] if first_boarding else []
         exposure = to_exposure(walks, waits, feels_like)
         results.append(Slot(depart_at=slot, sun_minutes=exposure.sun_minutes, heat_dose=exposure.heat_dose))
@@ -77,16 +80,20 @@ def pick_best(slots: list[Slot], use_sun: bool) -> BestSlot | None:
 async def find_best_time(request: BestTimeRequest, client_hash: str) -> BestTimeResponse:
     slots = slot_times(request)
     plan_request = PlanRequest(
-        origin=request.origin, destination=request.destination, depart_at=slots[0], allow_erickshaw=False
+        origin=request.origin,
+        destination=request.destination,
+        depart_at=slots[0],
+        preference=FASTEST_FIRST,
+        allow_erickshaw=False,
     )
     plan = await build_plan(plan_request, slots[0], client_hash)
     top = plan.options[0]
     _, feels_like = await trip_conditions(top.legs, slots[0])
-    paths = await walk_paths(top)
-    if paths is None:
+    lines = await walk_lines(top)
+    if lines is None:
         results = temperature_slots(top, slots, feels_like)
         return BestTimeResponse(
             basis="TEMPERATURE_ONLY", shade=plan.shade, slots=results, best=pick_best(results, False), note=NOTE
         )
-    results = shade_slots(top, paths, slots, feels_like)
+    results = shade_slots(top, lines, slots, feels_like)
     return BestTimeResponse(basis="SHADE", shade=plan.shade, slots=results, best=pick_best(results, True), note=NOTE)

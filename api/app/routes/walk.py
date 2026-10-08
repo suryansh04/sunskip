@@ -1,5 +1,5 @@
 import asyncio
-from dataclasses import dataclass, field
+from dataclasses import dataclass
 from datetime import datetime
 from itertools import pairwise
 
@@ -8,7 +8,7 @@ import networkx as nx
 from app.config import IST, settings
 from app.core.formulas import heat_weight
 from app.core.geo import Point, haversine_m
-from app.db.walk_queries import load_corridor_segments, load_segment_shade, load_segments
+from app.db.walk_queries import load_corridor_segments
 
 SunLookup = dict[tuple[int, int], tuple[float, float]]  # (segment id, IST hour) -> (sun_fraction, nodata_fraction)
 NO_SHADE_ROW = (0.0, 0.0)  # no row means the sun is below 5°, so no sun on the path
@@ -22,7 +22,6 @@ class WalkPath:
     length_m: float
     nodata_m: float
     sun: SunLookup
-    names: dict[int, str | None] = field(default_factory=dict)
 
 
 @dataclass
@@ -110,15 +109,3 @@ async def find_shadiest_path(google_coords: list[Point], start_at: datetime, fee
     if nodes is None:
         return None
     return to_walk_path(nodes, graph, corridor, start_hour.hour)
-
-
-async def load_walk_path(segment_ids: list[int], coords: list[Point], month: int) -> WalkPath:
-    """Rebuilds a walk we planned earlier (from its segment ids) with that month's shade for every hour."""
-    segments = {row["id"]: row for row in await load_segments(segment_ids)}
-    sun = {
-        (row["segment_id"], row["hour"]): (row["sun_fraction"], row["nodata_fraction"])
-        for row in await load_segment_shade(segment_ids, month)
-    }
-    pieces = [(segment_id, segments[segment_id]["length_m"]) for segment_id in segment_ids]
-    names = {segment_id: row["name"] for segment_id, row in segments.items()}
-    return WalkPath(segment_ids, coords, pieces, sum(length for _, length in pieces), 0.0, sun, names)

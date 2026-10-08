@@ -1,14 +1,20 @@
 from collections import defaultdict
+from collections.abc import Callable
 from dataclasses import dataclass
 from datetime import datetime, timedelta
+
+import numpy as np
 
 from app.conditions.report import start_of_hour
 from app.config import settings
 from app.contracts.models import Exposure
 from app.core.formulas import dose_weight, round_half_up
+from app.core.geo import Point, line_length_m, sample_line
 from app.routes.walk import NO_SHADE_ROW, WalkPath
+from app.shade.tiles import NO_DATA, sun_bits
 
 SECONDS_PER_MINUTE = 60
+SHADE = 0
 
 
 @dataclass
@@ -33,22 +39,55 @@ def unknown_walk_sun(length_m: float, peak_feels_like_c: float | None) -> WalkSu
     return WalkSun(length_m, None, 0.0, peak_feels_like_c)
 
 
-def walk_sun(path: WalkPath, start_at: datetime, feels_like: dict) -> WalkSun:
-    """Walks the path piece by piece; the clock (and so the hour) moves forward at walking speed."""
+@dataclass
+class LineShade:
+    points: list[Point]  # evenly spaced along the line
+    bits: np.ndarray  # (points, 24): 1 sun, 0 shade, -1 no data
+    piece_m: float  # line length each point stands for
+
+
+async def load_line_shade(coords: list[Point], month: int, spacing_m: float) -> LineShade | None:
+    """Sun or shade straight from the Solar files along any walking line; None if there's no data at all."""
+    points = sample_line(coords, spacing_m)
+    bits = await sun_bits(points, month)
+    if (bits == NO_DATA).all():
+        return None
+    return LineShade(points, bits, line_length_m(coords) / len(points))
+
+
+def sum_sun(lengths: list[float], sun_share_at: Callable[[int, int], float], start_at: datetime, feels_like: dict):
+    """Walks piece by piece; the clock (and so the hour) moves forward at walking speed."""
     walked_m, hot_minutes, peak = 0.0, 0.0, None
     sun_by_hour = defaultdict(float)
-    for segment_id, length in path.pieces:
+    for index, length in enumerate(lengths):
         hour = start_of_hour(start_at + timedelta(seconds=walked_m / settings.walk_speed_mps))
-        sun_fraction, nodata_fraction = path.sun.get((segment_id, hour.hour), NO_SHADE_ROW)
-        sun_share = 1.0 if nodata_fraction >= 1 else sun_fraction  # no data counts as sun
-        minutes = length * sun_share / settings.walk_speed_mps / SECONDS_PER_MINUTE
+        minutes = length * sun_share_at(index, hour.hour) / settings.walk_speed_mps / SECONDS_PER_MINUTE
         sun_by_hour[hour] += minutes
         feels = feels_like.get(hour)
         if feels is not None:
             peak = feels if peak is None else max(peak, feels)
             hot_minutes += minutes if feels >= settings.heat_alert_feels_like_c else 0
         walked_m += length
-    return WalkSun(path.length_m, dict(sun_by_hour), hot_minutes, peak)
+    return WalkSun(sum(lengths), dict(sun_by_hour), hot_minutes, peak)
+
+
+def walk_sun(path: WalkPath, start_at: datetime, feels_like: dict) -> WalkSun:
+    def sun_share(index: int, hour: int) -> float:
+        sun_fraction, nodata_fraction = path.sun.get((path.pieces[index][0], hour), NO_SHADE_ROW)
+        return 1.0 if nodata_fraction >= 1 else sun_fraction  # no data counts as sun
+
+    return sum_sun([length for _, length in path.pieces], sun_share, start_at, feels_like)
+
+
+def line_sun(line: LineShade, start_at: datetime, feels_like: dict) -> WalkSun:
+    def sun_share(index: int, hour: int) -> float:
+        return 0.0 if line.bits[index, hour] == SHADE else 1.0  # no data counts as sun
+
+    return sum_sun([line.piece_m] * len(line.points), sun_share, start_at, feels_like)
+
+
+def line_nodata_m(line: LineShade, start_at: datetime) -> float:
+    return float((line.bits[:, start_of_hour(start_at).hour] == NO_DATA).sum()) * line.piece_m
 
 
 def wait_sun_minutes(wait_seconds: int, stop_shaded: bool | None, stop_sun_fraction: float | None) -> float:
@@ -83,7 +122,7 @@ def to_exposure(walks: list[WalkSun], waits: list[tuple[float, datetime]] | None
     sun_m = sun_minutes * SECONDS_PER_MINUTE * settings.walk_speed_mps
     exposure.sun_minutes = round_half_up(sun_minutes)
     exposure.sun_minutes_hot = round_half_up(sum(walk.hot_sun_minutes for walk in walks))
-    exposure.shade_pct = round_half_up(100 * (1 - sun_m / length)) if length else None
+    exposure.shade_pct = round_half_up(max(0.0, 100 * (1 - sun_m / length))) if length else None  # no -0.0
     exposure.heat_dose = round_half_up(
         sum(minutes * dose_weight(feels_like.get(hour)) for hour, minutes in buckets.items())
     )
