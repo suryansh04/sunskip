@@ -15,7 +15,7 @@ USER_AGENT = "SunSkip/1.0 (shade-aware walking routes, India)"
 http_client = httpx.AsyncClient(timeout=settings.outside_call_timeout_s, headers={"User-Agent": USER_AGENT})
 
 
-def _describe_error(error: Exception) -> str:
+def describe_error(error: Exception) -> str:
     # Only the type and status: URLs can carry API keys
     if isinstance(error, httpx.HTTPStatusError):
         return f"HTTP {error.response.status_code}"
@@ -27,7 +27,7 @@ async def track_service(service: str):
     try:
         yield
     except Exception as error:
-        await record_service_result(service, _describe_error(error))
+        await record_service_result(service, describe_error(error))
         raise
     await record_service_result(service, None)
 

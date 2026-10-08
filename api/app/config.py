@@ -50,6 +50,7 @@ class Settings(BaseSettings):
     max_shade_map_km2: float = 1
     solar_monthly_call_budget: int = 6500
     worker_solar_concurrency: int = 4
+    solar_geotiffs_per_minute: int = 150  # Google's project limit is 180 a minute; stay under it
     overpass_urls: list[str] = [
         "https://overpass-api.de/api/interpreter",
         "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
