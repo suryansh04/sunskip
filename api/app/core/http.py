@@ -5,7 +5,10 @@ import httpx
 from app.config import settings
 from app.db.status_queries import record_service_result
 
-http_client = httpx.AsyncClient(timeout=settings.outside_call_timeout_s)
+# Public services like Overpass refuse requests that don't name the app
+USER_AGENT = "SunSkip/1.0 (shade-aware walking routes, India)"
+
+http_client = httpx.AsyncClient(timeout=settings.outside_call_timeout_s, headers={"User-Agent": USER_AGENT})
 
 
 def _describe_error(error: Exception) -> str:

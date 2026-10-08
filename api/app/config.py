@@ -50,7 +50,10 @@ class Settings(BaseSettings):
     max_shade_map_km2: float = 1
     solar_monthly_call_budget: int = 6500
     worker_solar_concurrency: int = 4
-    overpass_url: str = "https://overpass-api.de/api/interpreter"
+    overpass_urls: list[str] = [
+        "https://overpass-api.de/api/interpreter",
+        "https://maps.mail.ru/osm/tools/overpass/api/interpreter",
+    ]
     representative_day: int = 15
     min_sun_elevation_deg: float = 5
     max_segment_m: float = 50
