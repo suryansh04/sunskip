@@ -7,11 +7,11 @@ from app.core.geo import Point, offset_point, sample_line
 from app.core.sun import sun_elevations
 from app.db.score_queries import load_stops_in_cells, load_unready_segments, save_segment_shade, save_stop_shade
 from app.db.shade_queries import get_cell_statuses
-from app.shade.tiles import HOURS, cell_of, group_by_cell, month_bits
+from app.shade.queue import DONE
+from app.shade.tiles import HOURS, NO_DATA, SUN, cell_of, group_by_cell, month_bits
 
 MONTHS = range(1, 13)
 STOP_GRID_STEP_M = 2.5  # 3 x 3 points around a stop, so roughly "within 5 m"
-DONE = {"READY", "NO_DATA"}
 
 
 def sunny_hours(point: Point) -> dict[int, list[int]]:
@@ -48,8 +48,8 @@ def build_rows(owners: list[tuple[int, list[Point]]], statuses: dict, hours: dic
             start += len(owner_points)
             for hour in hours[month]:
                 column = owner_bits[:, hour]
-                with_data = int((column >= 0).sum())
-                sun_fraction = float((column == 1).sum()) / with_data if with_data else 0.0
+                with_data = int((column != NO_DATA).sum())
+                sun_fraction = float((column == SUN).sum()) / with_data if with_data else 0.0
                 rows.append((owner_id, month, hour, sun_fraction, 1 - with_data / len(column)))
     return rows
 

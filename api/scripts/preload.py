@@ -7,6 +7,7 @@ from app.config import settings
 from app.db.pool import open_pool
 from app.db.shade_queries import find_cells_and_areas, get_area_statuses, get_cell_statuses, queue_job
 from app.db.status_queries import get_solar_calls_this_month
+from app.shade.queue import DONE
 from app.worker.overpass import run_overpass_query
 
 PILOT_WALK = {"type": "LineString", "coordinates": [[75.56516, 26.84406], [75.56537, 26.83894]]}  # MUJ -> Bus 26 stop
@@ -14,7 +15,6 @@ MUJ_BUFFER_M = 300
 JAIPUR_BBOX = "26.80,75.70,26.98,75.90"  # south, west, north, east
 STATION_RADIUS_M = 500
 STATION_QUERY = f'[out:json][timeout:50];node["railway"="station"]["station"="subway"]({JAIPUR_BBOX});out;'
-DONE = {"READY", "NO_DATA"}
 
 
 async def jaipur_metro_stations() -> list[dict]:

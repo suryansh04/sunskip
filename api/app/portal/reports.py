@@ -2,33 +2,25 @@
 
 from datetime import date, datetime, timedelta
 
+import asyncpg
+
 from app.config import IST
+from app.contracts.ids import segment_code, stretch_code, stretch_number
 from app.contracts.models import Shade
 from app.core.errors import ApiError
 from app.core.formulas import round_half_up, round_whole
+from app.db.demand_queries import APP_TRIPS_DAYS
 from app.db.portal_queries import load_heat_pain, load_stats, load_stretch, load_stretch_sun, load_top_origins
 from app.shade.bbox import BBox, bbox_polygon
 from app.shade.queue import ensure_shade
 
 DEFAULT_STATS_DAYS = 30
-APP_TRIPS_DAYS = 30
 ESTIMATED_BELOW_SHARE = 0.5  # walkers are "estimated" while app trips are under half of the estimate
 MONTHS, HOURS = 12, 24
-STRETCH_PREFIX = "str_"
 COORD_DECIMALS = 6
 
 
-def stretch_code(stretch_id: int) -> str:
-    return f"{STRETCH_PREFIX}{stretch_id:03d}"
-
-
-def stretch_number(code: str) -> int:
-    if not code.startswith(STRETCH_PREFIX) or not code[len(STRETCH_PREFIX) :].isdigit():
-        raise ApiError(404, "NOT_FOUND", "Unknown stretch")
-    return int(code[len(STRETCH_PREFIX) :])
-
-
-def origin_entry(row) -> dict:
+def origin_entry(row: asyncpg.Record) -> dict:
     # Points were snapped to a ~50 m grid; trim the float noise that leaves (18.523500000000002)
     location = {"lat": round(row["lat"], COORD_DECIMALS), "lng": round(row["lng"], COORD_DECIMALS)}
     return {"location": location, "count": row["count"]}
@@ -50,7 +42,7 @@ async def usage_stats(start_day: date | None, end_day: date | None) -> dict:
     }
 
 
-def pain_feature(row) -> dict:
+def pain_feature(row: asyncpg.Record) -> dict:
     walkers = row["walkers_per_day"]
     return {
         "type": "Feature",
@@ -60,7 +52,8 @@ def pain_feature(row) -> dict:
             "lengthM": round_whole(row["length_m"]),
             "sunShare": round_half_up(row["sun_share"], 2),
             "walkersPerDay": round_whole(walkers),
-            "walkersEstimated": row["app_trips_30d"] / APP_TRIPS_DAYS < ESTIMATED_BELOW_SHARE * walkers,
+            # No walkers at all is still a guess, never a measurement
+            "walkersEstimated": not walkers or row["app_trips_30d"] / APP_TRIPS_DAYS < ESTIMATED_BELOW_SHARE * walkers,
             "painScore": round_whole(row["pain_score"]),
         },
         "geometry": row["geometry"],
@@ -100,7 +93,7 @@ async def stretch_evidence(code: str) -> dict:
         "stretchId": code,
         "name": stretch["name"],
         "lengthM": round_whole(stretch["length_m"]),
-        "segmentIds": [f"seg_{segment_id}" for segment_id in stretch["segment_ids"]],
+        "segmentIds": [segment_code(segment_id) for segment_id in stretch["segment_ids"]],
         "sunByMonthHour": grid,
         "walkers": {
             "poiEstimate": round_whole(stretch["poi_walkers"]),

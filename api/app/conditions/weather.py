@@ -16,6 +16,7 @@ FORECAST_DAYS = 9  # today + 8, so a trip on day +7 still has 24 hours ahead
 FORECAST_TTL_MIN = 15
 ARCHIVE_TTL_MIN = 30 * 24 * 60
 ONE_YEAR_SAME_WEEKDAY = timedelta(days=364)
+ARCHIVE_START = date(1940, 1, 1)  # Open-Meteo has no older weather
 SOURCES = {  # cache kind -> (url, source name, cache minutes)
     "WEATHER": (FORECAST_URL, "open-meteo", FORECAST_TTL_MIN),
     "WEATHER_ARCHIVE": (ARCHIVE_URL, "open-meteo-archive", ARCHIVE_TTL_MIN),
@@ -73,6 +74,8 @@ async def _archive_day(lat: float, lng: float, day: date, shift: timedelta) -> t
 async def get_hourly_weather(lat: float, lng: float, at: datetime) -> tuple[HourlyWeather, bool, bool]:
     """Returns (hour -> (temp, feels-like), typical, stale) around `at`."""
     day, today = at.astimezone(IST).date(), datetime.now(IST).date()
+    if day < ARCHIVE_START:
+        raise ApiError(400, "INVALID_REQUEST", f"No weather data before {ARCHIVE_START.year}")
     if day > today + timedelta(days=FORECAST_AHEAD_DAYS):
         # Too far ahead to forecast: use the same weekday one year earlier, marked typical
         weather, stale = await _archive_day(lat, lng, day - ONE_YEAR_SAME_WEEKDAY, ONE_YEAR_SAME_WEEKDAY)

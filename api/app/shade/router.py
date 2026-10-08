@@ -5,10 +5,8 @@ from fastapi import APIRouter, Query, Request, Response
 from app.config import settings
 from app.contracts.models import ShadeJob
 from app.core.errors import ApiError
-from app.core.formulas import round_half_up, round_whole
-from app.db.shade_queries import get_job, load_shade_map
-from app.shade.bbox import bbox_polygon, parse_bbox
-from app.shade.queue import ensure_shade
+from app.db.shade_queries import get_job
+from app.shade.segments import shade_map
 
 READY_CACHE_SECONDS = 86400
 
@@ -23,26 +21,11 @@ async def get_shade_segments(
     month: int = Query(ge=1, le=12),
     hour: int = Query(ge=0, le=23),
 ) -> dict:
-    box = parse_bbox(bbox, settings.max_shade_map_km2)
-    shade = await ensure_shade(bbox_polygon(box), 0, "MAP", request.state.client_hash)
+    answer, shade = await shade_map(bbox, month, hour, request.state.client_hash)
     response.headers["Cache-Control"] = (
         f"public, max-age={READY_CACHE_SECONDS}" if shade.status == "READY" else "no-store"
     )
-    features = [
-        {
-            "type": "Feature",
-            "properties": {
-                "id": f"seg_{row['id']}",
-                "sunFraction": round_half_up(row["sun_fraction"], 2),
-                "lengthM": round_whole(row["length_m"]),
-                "stretchId": f"str_{row['stretch_id']:03d}" if row["stretch_id"] else None,
-            },
-            "geometry": row["geometry"],
-        }
-        for row in await load_shade_map(box, month, hour)
-    ]
-    shade_json = shade.model_dump(mode="json", by_alias=True)
-    return {"month": month, "hour": hour, "shade": shade_json, "type": "FeatureCollection", "features": features}
+    return answer
 
 
 @router.get("/shade/jobs/{job_id}", response_model=ShadeJob)

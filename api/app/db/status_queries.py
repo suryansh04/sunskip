@@ -1,3 +1,5 @@
+import asyncpg
+
 from app.db.pool import get_pool
 
 THIS_MONTH_IST = "date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')::date"
@@ -18,7 +20,7 @@ async def record_worker_heartbeat() -> None:
     await record_service_result("worker", None)
 
 
-async def get_imagery_dates():
+async def get_imagery_dates() -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         "SELECT min(imagery_date) AS min_date, max(imagery_date) AS max_date FROM shade_cells WHERE status = 'READY'"
     )
@@ -29,7 +31,7 @@ async def get_solar_calls_this_month() -> int:
     return calls or 0
 
 
-async def get_shade_counts():
+async def get_shade_counts() -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         """
         SELECT (SELECT count(*) FROM shade_cells WHERE status = 'READY')   AS cells_ready,
@@ -41,5 +43,5 @@ async def get_shade_counts():
     )
 
 
-async def get_service_statuses():
+async def get_service_statuses() -> list[asyncpg.Record]:
     return await get_pool().fetch("SELECT service, last_success_at, last_error_at FROM service_status")

@@ -1,12 +1,14 @@
 import hashlib
 import hmac
 import uuid
+from collections.abc import Awaitable, Callable
 
-from fastapi import Request
+from fastapi import Request, Response
 
 from app.config import settings
 from app.core.errors import error_response
 
+CallNext = Callable[[Request], Awaitable[Response]]
 CLIENT_ID_FREE_PATHS = ("/v1/portal/", "/v1/health", "/docs", "/openapi.json")
 
 
@@ -19,7 +21,7 @@ def _has_origin_secret(request: Request) -> bool:
     return hmac.compare_digest(sent_secret, settings.origin_secret)
 
 
-async def _check_then_call(request: Request, call_next):
+async def _check_then_call(request: Request, call_next: CallNext) -> Response:
     if settings.origin_secret_check and not _has_origin_secret(request):
         return error_response(request, 403, "FORBIDDEN", "No access")
     client_id = request.headers.get("X-Client-Id")
@@ -29,7 +31,7 @@ async def _check_then_call(request: Request, call_next):
     return await call_next(request)
 
 
-async def guard_request(request: Request, call_next):
+async def guard_request(request: Request, call_next: CallNext) -> Response:
     request.state.request_id = str(uuid.uuid4())
     response = await _check_then_call(request, call_next)
     response.headers["X-Request-Id"] = request.state.request_id

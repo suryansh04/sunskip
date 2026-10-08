@@ -1,12 +1,14 @@
 import json
 from datetime import datetime
 
+import asyncpg
+
 from app.db.pool import get_pool
 
 TOP_ORIGINS = 10
 
 
-async def load_stats(start: datetime, end: datetime):
+async def load_stats(start: datetime, end: datetime) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         """
         SELECT count(*) AS requests,
@@ -21,7 +23,7 @@ async def load_stats(start: datetime, end: datetime):
     )
 
 
-async def load_top_origins(start: datetime, end: datetime):
+async def load_top_origins(start: datetime, end: datetime) -> list[asyncpg.Record]:
     return await get_pool().fetch(
         """
         SELECT ST_Y(origin_rounded) AS lat, ST_X(origin_rounded) AS lng, count(*) AS count
@@ -63,11 +65,11 @@ LIMIT $8
 """
 
 
-async def load_heat_pain(bbox: tuple, month: int, hours: tuple[int, int], limit: int):
+async def load_heat_pain(bbox: tuple, month: int, hours: tuple[int, int], limit: int) -> list[asyncpg.Record]:
     return await get_pool().fetch(HEAT_PAIN_SQL, *bbox, month, *hours, limit)
 
 
-async def load_stretch(stretch_id: int):
+async def load_stretch(stretch_id: int) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         """
         SELECT st.id, st.name, st.length_m, array_agg(s.id ORDER BY s.id) AS segment_ids,
@@ -84,7 +86,7 @@ async def load_stretch(stretch_id: int):
     )
 
 
-async def load_stretch_sun(stretch_id: int):
+async def load_stretch_sun(stretch_id: int) -> list[asyncpg.Record]:
     """Length-weighted sun share for every month and hour that has a row (sun >= 5° up)."""
     return await get_pool().fetch(
         """
@@ -97,7 +99,7 @@ async def load_stretch_sun(stretch_id: int):
     )
 
 
-async def load_segments_near(points: list[tuple[float, float]], reach_m: float):
+async def load_segments_near(points: list[tuple[float, float]], reach_m: float) -> list[asyncpg.Record]:
     """Shade-ready segments within reach of any of these points, with their walkers per day."""
     return await get_pool().fetch(
         """
@@ -110,14 +112,14 @@ async def load_segments_near(points: list[tuple[float, float]], reach_m: float):
     )
 
 
-async def load_stretch_segments(stretch_ids: list[int]):
+async def load_stretch_segments(stretch_ids: list[int]) -> list[asyncpg.Record]:
     return await get_pool().fetch(
         "SELECT id, stretch_id, ST_AsGeoJSON(geom)::json AS geometry FROM segments WHERE stretch_id = ANY($1)",
         stretch_ids,
     )
 
 
-async def load_stops_near_stretches(stretch_ids: list[int], max_m: float):
+async def load_stops_near_stretches(stretch_ids: list[int], max_m: float) -> list[asyncpg.Record]:
     return await get_pool().fetch(
         """
         SELECT DISTINCT ON (st.id) st.id AS stretch_id, ST_X(stop.geom) AS lng, ST_Y(stop.geom) AS lat

@@ -74,6 +74,7 @@ class Settings(BaseSettings):
     stretch_sun_diff: float = 0.2
     shade_sample_spacing_m: float = 5
     stop_match_m: float = 30
+    stop_shaded_below_sun: float = 0.5  # a stop counts as shaded when less than half of it is in sun
     graph_snap_max_m: float = 60
     privacy_grid_deg: float = 0.0005
     demand_radius_m: float = 400

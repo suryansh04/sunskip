@@ -5,7 +5,8 @@ from itertools import pairwise
 
 import networkx as nx
 
-from app.config import IST, settings
+from app.conditions.report import start_of_hour
+from app.config import settings
 from app.core.formulas import heat_weight
 from app.core.geo import Point, haversine_m
 from app.db.walk_queries import load_corridor_segments
@@ -99,7 +100,7 @@ def to_walk_path(nodes: list[int], graph: nx.Graph, corridor: Corridor, hour: in
 
 
 async def find_shadiest_path(google_coords: list[Point], start_at: datetime, feels_like: dict) -> WalkPath | None:
-    start_hour = start_at.astimezone(IST).replace(minute=0, second=0, microsecond=0)
+    start_hour = start_of_hour(start_at)
     corridor = await load_corridor({"type": "LineString", "coordinates": google_coords}, start_hour.month)
     start, end = nearest_node(corridor, google_coords[0]), nearest_node(corridor, google_coords[-1])
     if start is None or end is None or start == end:

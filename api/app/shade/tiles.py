@@ -1,6 +1,7 @@
 """Reads Google Solar's hourly shade files we saved, for any list of points."""
 
 import asyncio
+import logging
 from collections import defaultdict
 from functools import cache, lru_cache
 
@@ -17,8 +18,12 @@ from app.db.shade_queries import get_cell_statuses
 HOURS = 24
 CELL_PRECISION = 7
 NO_DATA = -1
+SHADE = 0
 SUN = 1
 CACHED_TILES = 32  # ~5 MB each decoded, so about 160 MB at most
+
+# Google's files carry a harmless odd TIFF tag; GDAL warns about it on every open
+logging.getLogger("rasterio._env").setLevel(logging.ERROR)
 
 
 def cell_of(point: Point) -> str:

@@ -73,7 +73,9 @@ async def score_transit_leg(leg: Leg) -> tuple[float, datetime]:
     leg.wait_seconds = headway // 2 if headway else settings.default_wait_seconds
     hour = start_of_hour(leg.start_at)
     location = leg.from_.location
-    stop = await find_stop_shade(location.lng, location.lat, hour.month, hour.hour, settings.stop_match_m)
+    stop = await find_stop_shade(
+        location.lng, location.lat, hour.month, hour.hour, settings.stop_match_m, settings.stop_shaded_below_sun
+    )
     leg.stop_shaded = stop["shaded"] if stop else None
     return wait_sun_minutes(leg.wait_seconds, leg.stop_shaded, stop["sun_fraction"] if stop else None), leg.start_at
 

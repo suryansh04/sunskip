@@ -2,15 +2,18 @@ import json
 from datetime import date
 from uuid import UUID
 
+import asyncpg
+
 from app.db.pool import get_pool
 
 CELL_GRID_DEG = 0.0003  # sample spacing small enough to hit every ~150 m geohash cell
 
+# The grid is laid per separate piece: a trip with walks in two cities would otherwise grid everything in between
 CELLS_FOR_AREA_SQL = """
-WITH corr AS (SELECT ST_Buffer(ST_GeomFromGeoJSON($1)::geography, $2)::geometry AS c),
-pts AS (SELECT ST_Centroid(sq.geom) AS p FROM corr, ST_SquareGrid($3, corr.c) sq)
+WITH parts AS (SELECT (ST_Dump(ST_Buffer(ST_GeomFromGeoJSON($1)::geography, $2)::geometry)).geom AS c),
+pts AS (SELECT ST_Centroid(sq.geom) AS p, parts.c FROM parts, ST_SquareGrid($3, parts.c) sq)
 SELECT array_agg(DISTINCT ST_GeoHash(p, 7)) AS cells, array_agg(DISTINCT ST_GeoHash(p, 6)) AS osm_areas
-FROM pts, corr WHERE ST_Intersects(p, c)
+FROM pts WHERE ST_Intersects(p, c)
 """
 
 
@@ -29,7 +32,7 @@ async def get_area_statuses(areas: list[str]) -> dict[str, str]:
     return {row["geohash"]: row["status"] for row in rows}
 
 
-async def find_active_job(cells: list[str]):
+async def find_active_job(cells: list[str]) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         "SELECT id, cells, cells_done FROM shade_jobs WHERE status IN ('QUEUED', 'RUNNING') "
         "AND cells && $1 ORDER BY created_at DESC LIMIT 1",
@@ -75,7 +78,7 @@ async def queue_job(reason: str, client_hash: str | None, cells: list[str], area
     return str(job_id)
 
 
-async def claim_next_job():
+async def claim_next_job() -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         """
         UPDATE shade_jobs SET status = 'RUNNING', started_at = now()
@@ -106,7 +109,7 @@ async def finish_job(job_id: UUID, status: str, error: str | None) -> None:
     )
 
 
-async def claim_cell(geohash: str):
+async def claim_cell(geohash: str) -> asyncpg.Record | None:
     """Moves a PENDING cell to FETCHING and returns its centre, or None if someone else has it."""
     return await get_pool().fetchrow(
         "UPDATE shade_cells SET status = 'FETCHING', requested_at = now() "
@@ -160,7 +163,7 @@ async def count_cell_done(job_id: UUID, no_data: bool) -> None:
     )
 
 
-async def load_shade_map(bbox: tuple[float, float, float, float], month: int, hour: int):
+async def load_shade_map(bbox: tuple[float, float, float, float], month: int, hour: int) -> list[asyncpg.Record]:
     return await get_pool().fetch(
         """
         SELECT s.id, s.stretch_id, s.length_m, ST_AsGeoJSON(s.geom)::json AS geometry,
@@ -175,7 +178,7 @@ async def load_shade_map(bbox: tuple[float, float, float, float], month: int, ho
     )
 
 
-async def get_job(job_id: UUID):
+async def get_job(job_id: UUID) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         "SELECT id, status, reason, cardinality(cells) AS cells_total, cells_done, cells_no_data "
         "FROM shade_jobs WHERE id = $1",

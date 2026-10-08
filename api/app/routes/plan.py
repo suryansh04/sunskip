@@ -116,7 +116,9 @@ def walk_coverage(option: RouteOption) -> str | None:
     return next((level for level in ("NONE", "PARTIAL", "FULL") if level in coverages), None)
 
 
-async def save_plan(plan: PlanResponse, request: PlanRequest, depart_at: datetime, client_hash: str, started: float):
+async def save_plan(
+    plan: PlanResponse, request: PlanRequest, depart_at: datetime, client_hash: str, started: float
+) -> None:
     top = plan.options[0]
     trip_id = uuid.UUID(plan.trip_id)
     await save_trip(

@@ -3,12 +3,15 @@
 import calendar
 from collections import defaultdict
 
+import asyncpg
+
 from app.config import settings
+from app.contracts.ids import stretch_code
 from app.contracts.models import MAX_SIMULATED_ITEMS, LatLng, SimulatedItem
 from app.core.formulas import round_whole
 from app.core.geo import Point, haversine_m, sample_line
 from app.db.portal_queries import load_stops_near_stretches, load_stretch_segments
-from app.portal.reports import ready_pain_rows, stretch_code
+from app.portal.reports import ready_pain_rows
 from app.portal.simulate import SegmentResult, minutes_saved_per_day, simulate
 from app.shade.bbox import BBox
 
@@ -53,7 +56,7 @@ def shelter_items(stop: Point | None, segment_lines: list[list[Point]]) -> list[
     ]
 
 
-def shade_pct(segments: list[SegmentResult], after: bool) -> float | None:
+def stretch_shade_pct(segments: list[SegmentResult], after: bool) -> int | None:
     known = [segment for segment in segments if segment.sun_before is not None]
     length = sum(segment.length_m for segment in known)
     if not length:
@@ -62,7 +65,7 @@ def shade_pct(segments: list[SegmentResult], after: bool) -> float | None:
     return round_whole(100 * (1 - sun_m / length))
 
 
-def reason(row, month: int, hours: tuple[int, int]) -> str:
+def reason(row: asyncpg.Record, month: int, hours: tuple[int, int]) -> str:
     return (
         f"{round_whole(row['length_m'])} m in {round_whole(100 * row['sun_share'])}% sun "
         f"from {hours[0]}:00 to {hours[1]}:00 in {calendar.month_name[month]}, "
@@ -79,7 +82,12 @@ async def stretch_segments(stretch_ids: list[int]) -> dict[int, dict[int, list[P
 
 
 async def score_stretch(
-    row, segment_ids: set[int], items: list[SimulatedItem], month: int, hours: tuple[int, int], kind: str
+    row: asyncpg.Record,
+    segment_ids: set[int],
+    items: list[SimulatedItem],
+    month: int,
+    hours: tuple[int, int],
+    kind: str,
 ) -> dict | None:
     simulation = await simulate(month, hours, items)
     if simulation is None:
@@ -95,8 +103,8 @@ async def score_stretch(
         "count": len(items),
         "positions": [{"lat": item.location.lat, "lng": item.location.lng} for item in items],
         "impact": {
-            "shadePctBefore": shade_pct(on_stretch, after=False),
-            "shadePctAfter": shade_pct(on_stretch, after=True),
+            "shadePctBefore": stretch_shade_pct(on_stretch, after=False),
+            "shadePctAfter": stretch_shade_pct(on_stretch, after=True),
             "walkersPerDay": round_whole(row["walkers_per_day"]),
             "sunMinutesSavedPerDay": round_whole(saved),
         },
@@ -128,7 +136,7 @@ async def recommend(box: BBox, kind: str, budget_inr: int | None, month: int, ho
             for row in await load_stops_near_stretches(stretch_ids, STOP_NEAR_M)
         }
 
-    async def score(row) -> dict | None:
+    async def score(row: asyncpg.Record) -> dict | None:
         stretch = segments[row["stretch_id"]]
         lines = list(stretch.values())
         items = tree_items(lines) if kind == "TREE" else shelter_items(stops.get(row["stretch_id"]), lines)
