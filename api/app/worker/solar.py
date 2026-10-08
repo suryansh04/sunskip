@@ -1,12 +1,13 @@
 import asyncio
 import logging
+import time
 from datetime import date
 from uuid import UUID
 
 import httpx
 
 from app.config import settings
-from app.core.http import http_client, track_service
+from app.core.http import describe_error, http_client, track_service
 from app.core.storage import save_file
 from app.db.shade_queries import (
     claim_cell,
@@ -21,6 +22,9 @@ SOLAR_URL = "https://solar.googleapis.com/v1/dataLayers:get"
 SOLAR_RADIUS_M = 100  # a 200 x 200 m tile, enough to cover one ~150 m cell
 DOWNLOAD_TIMEOUT_S = 60  # each GeoTIFF is a few MB
 MAX_ATTEMPTS = 3
+DOWNLOAD_TRIES = 3
+QUOTA_STATUS = 429
+SECONDS_PER_MINUTE = 60
 QUALITIES = {"HIGH", "MEDIUM", "BASE"}
 
 logger = logging.getLogger("worker")
@@ -44,16 +48,40 @@ async def get_data_layers(lat: float, lng: float) -> dict | None:
     return response.json()
 
 
+class DownloadPacer:
+    """Spaces GeoTIFF downloads out, because Google allows only so many per minute per project."""
+
+    def __init__(self, per_minute: int):
+        self.gap_s = SECONDS_PER_MINUTE / per_minute
+        self.next_at = 0.0
+        self.lock = asyncio.Lock()
+
+    async def wait_turn(self) -> None:
+        async with self.lock:
+            wait_s = self.next_at - time.monotonic()
+            if wait_s > 0:
+                await asyncio.sleep(wait_s)
+            self.next_at = time.monotonic() + self.gap_s
+
+
+pacer = DownloadPacer(settings.solar_geotiffs_per_minute)
+
+
 async def download_layer(url: str) -> bytes:
     # The download links need our key added and expire in about an hour
-    response = await http_client.get(f"{url}&key={settings.google_api_key}", timeout=DOWNLOAD_TIMEOUT_S)
-    response.raise_for_status()
-    return response.content
+    tries_left = DOWNLOAD_TRIES
+    while True:
+        await pacer.wait_turn()
+        response = await http_client.get(f"{url}&key={settings.google_api_key}", timeout=DOWNLOAD_TIMEOUT_S)
+        tries_left -= 1
+        if response.status_code != QUOTA_STATUS or tries_left == 0:
+            response.raise_for_status()
+            return response.content
+        await asyncio.sleep(SECONDS_PER_MINUTE)  # over the per-minute quota: wait for the next minute
 
 
 async def save_cell_files(geohash: str, layers: dict) -> None:
     urls = {f"month_{month:02d}.tif": url for month, url in enumerate(layers["hourlyShadeUrls"], start=1)}
-    urls["dsm.tif"] = layers["dsmUrl"]
     contents = await asyncio.gather(*(download_layer(url) for url in urls.values()))
     for name, content in zip(urls, contents, strict=True):
         await asyncio.to_thread(save_file, f"shade/{geohash}/{name}", content)
@@ -85,8 +113,8 @@ async def fetch_cell(geohash: str) -> bool:
         try:
             return await download_cell(geohash, center["lat"], center["lng"])
         except (httpx.HTTPError, OSError, KeyError) as error:
-            logger.warning("Cell %s attempt %d failed: %s", geohash, attempt, type(error).__name__)
-            await record_cell_failure(geohash, type(error).__name__, give_up=attempt == MAX_ATTEMPTS)
+            logger.warning("Cell %s attempt %d failed: %s", geohash, attempt, describe_error(error))
+            await record_cell_failure(geohash, describe_error(error), give_up=attempt == MAX_ATTEMPTS)
     return False
 
 
