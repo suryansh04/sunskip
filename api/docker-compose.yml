@@ -1,0 +1,15 @@
+services:
+  api:
+    build: .
+    ports: ["8000:8000"]
+    env_file: .env
+    volumes: ["shade-cache:/srv/.data"]
+    restart: unless-stopped
+  worker:
+    build: .
+    command: python -m app.worker
+    env_file: .env
+    volumes: ["shade-cache:/srv/.data"]
+    restart: unless-stopped
+volumes:
+  shade-cache: # local copy of the Solar files; S3 keeps the master copy
