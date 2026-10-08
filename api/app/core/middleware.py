@@ -1,0 +1,36 @@
+import hashlib
+import hmac
+import uuid
+
+from fastapi import Request
+
+from app.config import settings
+from app.core.errors import error_response
+
+CLIENT_ID_FREE_PATHS = ("/v1/portal/", "/v1/health", "/docs", "/openapi.json")
+
+
+def hash_client_id(client_id: str) -> str:
+    return hmac.new(settings.client_id_salt.encode(), client_id.encode(), hashlib.sha256).hexdigest()
+
+
+def _has_origin_secret(request: Request) -> bool:
+    sent_secret = request.headers.get("X-Origin-Secret", "")
+    return hmac.compare_digest(sent_secret, settings.origin_secret)
+
+
+async def _check_then_call(request: Request, call_next):
+    if settings.origin_secret_check and not _has_origin_secret(request):
+        return error_response(request, 403, "FORBIDDEN", "No access")
+    client_id = request.headers.get("X-Client-Id")
+    request.state.client_hash = hash_client_id(client_id) if client_id else None
+    if not client_id and not request.url.path.startswith(CLIENT_ID_FREE_PATHS):
+        return error_response(request, 400, "INVALID_REQUEST", "X-Client-Id header is required")
+    return await call_next(request)
+
+
+async def guard_request(request: Request, call_next):
+    request.state.request_id = str(uuid.uuid4())
+    response = await _check_then_call(request, call_next)
+    response.headers["X-Request-Id"] = request.state.request_id
+    return response

@@ -1,0 +1,8 @@
+services:
+  db:
+    image: postgis/postgis:16-3.4
+    environment: { POSTGRES_DB: sunskip, POSTGRES_USER: sunskip, POSTGRES_PASSWORD: sunskip }
+    ports: ["5433:5432"] # 5433 so it never clashes with a Postgres already installed on the laptop
+    volumes: ["db-data:/var/lib/postgresql/data"]
+volumes:
+  db-data:

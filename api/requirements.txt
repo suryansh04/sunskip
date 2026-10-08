@@ -1,0 +1,15 @@
+fastapi==0.142.4
+uvicorn[standard]
+pydantic-settings
+asyncpg
+httpx
+boto3
+networkx==3.7
+numpy
+rasterio==1.5.2
+shapely
+pyproj
+pvlib==0.16.1
+anthropic==1.12.1
+sarvamai==0.1.36
+ruff
