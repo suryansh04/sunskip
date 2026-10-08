@@ -1,9 +1,13 @@
+import logging
 from contextlib import asynccontextmanager
 
 import httpx
 
 from app.config import settings
 from app.db.status_queries import record_service_result
+
+# httpx logs every URL at INFO, and Google URLs carry our key, so keep it quiet
+logging.getLogger("httpx").setLevel(logging.WARNING)
 
 # Public services like Overpass refuse requests that don't name the app
 USER_AGENT = "SunSkip/1.0 (shade-aware walking routes, India)"
