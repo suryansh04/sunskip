@@ -162,6 +162,21 @@ async def count_cell_done(job_id: UUID, no_data: bool) -> None:
     )
 
 
+async def load_shade_map(bbox: tuple[float, float, float, float], month: int, hour: int):
+    return await get_pool().fetch(
+        """
+        SELECT s.id, s.stretch_id, s.length_m, ST_AsGeoJSON(s.geom)::json AS geometry,
+               COALESCE(sh.sun_fraction, 0) AS sun_fraction
+        FROM segments s
+        LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = $5 AND sh.hour = $6
+        WHERE s.shade_ready AND s.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
+        """,
+        *bbox,
+        month,
+        hour,
+    )
+
+
 async def get_job(job_id: UUID):
     return await get_pool().fetchrow(
         "SELECT id, status, reason, cardinality(cells) AS cells_total, cells_done, cells_no_data "

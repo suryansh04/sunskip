@@ -84,7 +84,7 @@ class Leg(ApiModel):
     stop_shaded: bool | None = None
     fare_inr: int | None = None
     swapped_from: Literal["WALK"] | None = None
-    segment_ids: list[int] = Field(default_factory=list)  # stored in trips, never returned
+    segment_ids: list[int] = Field(default_factory=list, exclude=True)  # stored in trips, never returned
 
 
 class RouteOption(ApiModel):
