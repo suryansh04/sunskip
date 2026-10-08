@@ -38,6 +38,12 @@ async def fetch_google_routes(request: PlanRequest, google_time: datetime) -> tu
     return ([] if isinstance(transit, Exception) else transit), walk_routes
 
 
+def route_fare(route: dict, legs: list[Leg]) -> int | None:
+    if all(leg.mode == "WALK" for leg in legs):
+        return WALK_ONLY_FARE_INR
+    return route_fare_inr(route)
+
+
 def unique_routes(routes: list[tuple[list[Leg], int | None]]) -> list[tuple[list[Leg], int | None]]:
     seen, unique = set(), []
     for legs, fare in routes:
@@ -76,15 +82,20 @@ async def build_plan(request: PlanRequest, depart_at: datetime, client_hash: str
     google_time = google_departure_time(depart_at)
     transit, walk = await fetch_google_routes(request, google_time)
     shift = depart_at - google_time
-    routes = unique_routes(
-        [(parse_route(route, depart_at, shift), route_fare_inr(route)) for route in transit]
-        + [(parse_route(route, depart_at, shift), WALK_ONLY_FARE_INR) for route in walk]
-    )
+    parsed = [(route, parse_route(route, depart_at, shift)) for route in transit + walk]
+    routes = unique_routes([(legs, route_fare(route, legs)) for route, legs in parsed])
     if not routes:
         raise ApiError(422, "NO_ROUTE_FOUND", "No route found. Try picking the places on the map")
     conditions, feels_like = await trip_conditions(routes[0][0], depart_at)
     shade = await check_shade(routes, client_hash)
-    options = [await build_option(legs, fare, depart_at, feels_like, shade) for legs, fare in routes]
+    options = []
+    for legs, fare in routes:
+        cooler_legs = [leg.model_copy(deep=True) for leg in legs]
+        option, has_cooler = await build_option(legs, fare, depart_at, feels_like, shade)
+        options.append(option)
+        if has_cooler:
+            cooler, _ = await build_option(cooler_legs, fare, depart_at, feels_like, shade, prefer_cooler=True)
+            options.append(cooler)
     if request.allow_erickshaw:
         swaps = [await erickshaw_option(option, depart_at, feels_like, shade) for option in options]
         options += [swap for swap in swaps if swap]

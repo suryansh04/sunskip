@@ -49,6 +49,6 @@ async def erickshaw_option(
     if not swapped_fares:
         return None
     fare = None if option.fare_inr is None else option.fare_inr + sum(swapped_fares)
-    swapped = await build_option(legs, fare, depart_at, feels_like, shade)
+    swapped, _ = await build_option(legs, fare, depart_at, feels_like, shade)
     swapped.warnings.append("FARE_ESTIMATED")
     return swapped

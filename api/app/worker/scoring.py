@@ -2,34 +2,16 @@ import asyncio
 from collections import defaultdict
 from datetime import datetime
 
-import numpy as np
-import rasterio
-from pyproj import Transformer
-
 from app.config import IST, settings
-from app.core.geo import Point, geohash_encode, offset_point, sample_line
-from app.core.storage import local_path
+from app.core.geo import Point, offset_point, sample_line
 from app.core.sun import sun_elevations
 from app.db.score_queries import load_stops_in_cells, load_unready_segments, save_segment_shade, save_stop_shade
 from app.db.shade_queries import get_cell_statuses
+from app.shade.tiles import HOURS, cell_of, group_by_cell, month_bits
 
-HOURS = 24
 MONTHS = range(1, 13)
-CELL_PRECISION = 7
-NO_DATA = -1
 STOP_GRID_STEP_M = 2.5  # 3 x 3 points around a stop, so roughly "within 5 m"
 DONE = {"READY", "NO_DATA"}
-
-
-def read_sun_bits(geohash: str, month: int, points: list[Point]) -> np.ndarray:
-    """(len(points), 24) of 1 = sun, 0 = shade, -1 = no data, for the representative day."""
-    with rasterio.open(local_path(f"shade/{geohash}/month_{month:02d}.tif")) as tile:
-        to_tile = Transformer.from_crs("EPSG:4326", tile.crs, always_xy=True)
-        xs, ys = to_tile.transform([point[0] for point in points], [point[1] for point in points])
-        values = np.ma.array(list(tile.sample(zip(xs, ys, strict=True), masked=True)))
-    # Careful: in Solar's data a set bit means SUN. Bit (day - 1) is that day of the month
-    sun = ((values.astype(np.uint32) >> (settings.representative_day - 1)) & 1).astype(np.int8)
-    return np.where(np.ma.getmaskarray(values), NO_DATA, sun).astype(np.int8)
 
 
 def sunny_hours(point: Point) -> dict[int, list[int]]:
@@ -53,20 +35,10 @@ def stop_grid(point: Point) -> list[Point]:
     return [offset_point(point, east, north) for east in steps for north in steps]
 
 
-def month_bits(points: list[Point], cells_of_points: dict[str, list[int]], statuses: dict, month: int) -> np.ndarray:
-    bits = np.full((len(points), HOURS), NO_DATA, dtype=np.int8)
-    for geohash, indexes in cells_of_points.items():
-        if statuses.get(geohash) == "READY":
-            bits[indexes] = read_sun_bits(geohash, month, [points[index] for index in indexes])
-    return bits
-
-
 def build_rows(owners: list[tuple[int, list[Point]]], statuses: dict, hours: dict) -> list[tuple]:
     """Rows of (owner id, month, hour, sun_fraction, nodata_fraction); an owner is a segment or stop with its points."""
     points = [point for _, owner_points in owners for point in owner_points]
-    cells_of_points = defaultdict(list)
-    for index, point in enumerate(points):
-        cells_of_points[geohash_encode(point[1], point[0], CELL_PRECISION)].append(index)
+    cells_of_points = group_by_cell(points)
     rows = []
     for month in MONTHS:
         bits = month_bits(points, cells_of_points, statuses, month)
@@ -91,12 +63,12 @@ async def score_cells(cells: list[str]) -> None:
     all_points = [point for _, points in segments + stops for point in points]
     if not all_points:
         return
-    statuses = await get_cell_statuses(list({geohash_encode(p[1], p[0], CELL_PRECISION) for p in all_points}))
+    statuses = await get_cell_statuses(list({cell_of(point) for point in all_points}))
     # A segment is ready only when every sample point sits in a cell we've finished
     ready = [
         (segment_id, points)
         for segment_id, points in segments
-        if all(statuses.get(geohash_encode(p[1], p[0], CELL_PRECISION)) in DONE for p in points)
+        if all(statuses.get(cell_of(point)) in DONE for point in points)
     ]
     hours = sunny_hours(all_points[0])
     segment_rows = await asyncio.to_thread(build_rows, ready, statuses, hours)
