@@ -51,11 +51,11 @@ sunskip_app/
 │   │   ├── main.py            creates the app, adds middleware, includes all routers
 │   │   ├── config.py          all settings + secrets
 │   │   ├── core/              errors, middleware, http (shared client), formulas, geo, sun, storage
-│   │   ├── contracts/         models.py (Pydantic shapes), fakes.py
+│   │   ├── contracts/         models.py (Pydantic shapes), ids.py (seg_/str_ ids), fakes.py
 │   │   ├── db/                pool.py, *_queries.py, cleanup.py
 │   │   ├── meta/              router.py
 │   │   ├── conditions/        router.py, weather.py, air.py
-│   │   ├── shade/             router.py, queue.py
+│   │   ├── shade/             router.py, queue.py, segments.py, tiles.py, bbox.py
 │   │   ├── routes/            router.py, google.py, legs.py, walk.py, exposure.py, ranking.py, plan.py, ...
 │   │   ├── portal/            router.py, heat_pain.py, recommendations.py, simulate.py
 │   │   ├── health/            router.py
@@ -114,7 +114,7 @@ The file names inside the feature folders are a starting point. Create a file on
 - Every outside call: 10 s timeout, updates `service_status`, never logs keys or request bodies.
 - Errors always use `{ "error": { "code", "message", "requestId" } }` with the codes in api.md §3.
 - Every request finishes in under 29 s. Never make a request wait for shade data; return `PREPARING` + `jobId`.
-- `ruff` must pass.
+- `ruff` must pass. It also checks type hints (rule 15).
 
 ## Product rules (never break these)
 

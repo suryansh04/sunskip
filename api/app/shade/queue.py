@@ -12,7 +12,7 @@ from app.db.status_queries import get_solar_calls_this_month
 
 INDIA_BBOX = (68.1, 6.5, 97.5, 35.7)  # west, south, east, north; a rough box around India
 IN_PROGRESS = {"PENDING", "FETCHING"}
-DONE = {"READY", "NO_DATA"}
+DONE = {"READY", "NO_DATA"}  # cells we never need to fetch again
 
 
 def preparing(job_id: str, cells_total: int, cells_done: int) -> Shade:

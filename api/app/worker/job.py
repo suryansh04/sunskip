@@ -1,6 +1,8 @@
 import asyncio
 import logging
 
+import asyncpg
+
 from app.db.shade_queries import finish_job
 from app.worker.overpass import load_osm_area
 from app.worker.scoring import score_cells
@@ -15,7 +17,7 @@ async def load_osm_areas(areas: list[str]) -> None:
         await load_osm_area(geohash6)
 
 
-async def run_job(job) -> None:
+async def run_job(job: asyncpg.Record) -> None:
     logger.info("Job %s: %d areas, %d cells", job["id"], len(job["osm_areas"]), len(job["cells"]))
     try:
         # OSM and Solar don't depend on each other, so fetch both at once. Wait for both before

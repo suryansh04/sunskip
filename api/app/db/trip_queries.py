@@ -2,6 +2,8 @@ from dataclasses import dataclass
 from datetime import datetime
 from uuid import UUID
 
+import asyncpg
+
 from app.config import settings
 from app.db.pool import get_pool
 
@@ -35,7 +37,7 @@ async def save_trip(trip_id: UUID, client_hash: str, request: dict, options: lis
     )
 
 
-async def load_trip(trip_id: UUID):
+async def load_trip(trip_id: UUID) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         "SELECT id, request, options FROM trips WHERE id = $1 AND expires_at > now()", trip_id
     )

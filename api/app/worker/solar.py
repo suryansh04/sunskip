@@ -51,7 +51,7 @@ async def get_data_layers(lat: float, lng: float) -> dict | None:
 class DownloadPacer:
     """Spaces GeoTIFF downloads out, because Google allows only so many per minute per project."""
 
-    def __init__(self, per_minute: int):
+    def __init__(self, per_minute: int) -> None:
         self.gap_s = SECONDS_PER_MINUTE / per_minute
         self.next_at = 0.0
         self.lock = asyncio.Lock()

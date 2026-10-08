@@ -2,7 +2,8 @@ line-length = 120
 target-version = "py312"
 
 [lint]
-select = ["E", "F", "I", "B", "UP", "RUF", "BLE"]
+select = ["E", "F", "I", "B", "UP", "RUF", "BLE", "ANN"]
+ignore = ["ANN401"]  # Any is fine where a value really can be anything
 
 [lint.flake8-bugbear]
 extend-immutable-calls = ["fastapi.Query"]

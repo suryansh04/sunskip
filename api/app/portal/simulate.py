@@ -12,13 +12,18 @@ from shapely.geometry import Point as ShapelyPoint
 from shapely.geometry import box
 
 from app.config import IST, settings
-from app.contracts.models import SimulatedItem
+from app.contracts.ids import segment_code
+from app.contracts.models import SimulatedItem, SimulateRequest
+from app.core.errors import ApiError
+from app.core.formulas import round_half_up, round_whole
 from app.core.geo import Point, sample_line, to_local_m
 from app.core.sun import sun_positions
 from app.db.portal_queries import load_segments_near
-from app.shade.tiles import NO_DATA, SUN, sun_bits
+from app.shade.queue import ensure_shade
+from app.shade.tiles import NO_DATA, SHADE, SUN, sun_bits
 
 SECONDS_PER_MINUTE = 60
+SUN_FRACTION_PLACES = 2
 
 
 @dataclass
@@ -36,7 +41,7 @@ class Simulation:
     segments: list[SegmentResult]
 
 
-def shadow_shape(item: SimulatedItem, elevation: float, azimuth: float, origin: Point):
+def shadow_shape(item: SimulatedItem, elevation: float, azimuth: float, origin: Point) -> shapely.Geometry:
     """The item's shadow on the ground, in metres around `origin`: its crown or roof moved away from the sun."""
     x, y = to_local_m((item.location.lng, item.location.lat), origin)
     reach = item.height_m / math.tan(math.radians(elevation))
@@ -92,7 +97,7 @@ async def simulate(month: int, hours: tuple[int, int], items: list[SimulatedItem
     for hour, elevation, azimuth in sun_by_hour(month, hours, origin):
         shadow = shapely.union_all([shadow_shape(item, elevation, azimuth, origin) for item in items])
         shaded = shapely.contains_xy(shadow, xs, ys)
-        after[shaded & (before[:, hour] == SUN), hour] = 0
+        after[shaded & (before[:, hour] == SUN), hour] = SHADE
         hour_columns.append(hour)
         by_hour.append({"hour": hour, "before": shade_pct(before[:, hour]), "after": shade_pct(after[:, hour])})
     segments, start = [], 0
@@ -122,3 +127,42 @@ def minutes_saved_per_day(segments: list[SegmentResult]) -> float:
         for segment in segments
         if segment.sun_before is not None
     )
+
+
+def changed_segments(segments: list[SegmentResult]) -> list[dict]:
+    return [
+        {
+            "id": segment_code(segment.segment_id),
+            "sunFractionBefore": round_half_up(segment.sun_before, SUN_FRACTION_PLACES),
+            "sunFractionAfter": round_half_up(segment.sun_after, SUN_FRACTION_PLACES),
+        }
+        for segment in segments
+        if segment.sun_before is not None and segment.sun_after != segment.sun_before
+    ]
+
+
+async def simulate_report(request: SimulateRequest) -> dict:
+    """The endpoint's answer. Queues shade near the items if missing; 409 while it's on the way, 422 if none."""
+    points = [[item.location.lng, item.location.lat] for item in request.items]
+    shade = await ensure_shade(
+        {"type": "MultiPoint", "coordinates": points}, settings.simulation_reach_m, "PORTAL", None
+    )
+    simulation = await simulate(request.month, request.hours, request.items)
+    if simulation is None and shade.status == "PREPARING":
+        raise ApiError(409, "SHADE_PREPARING", "Preparing shade data for this area", {"jobId": shade.job_id})
+    if simulation is None:
+        raise ApiError(422, "NO_SHADE_DATA", "No paths with shade data near these items")
+    by_hour = [
+        {
+            "hour": hour["hour"],
+            "shadePctBefore": round_whole(hour["before"]),
+            "shadePctAfter": round_whole(hour["after"]),
+        }
+        for hour in simulation.by_hour
+    ]
+    return {
+        "byHour": by_hour,
+        "segments": changed_segments(simulation.segments),
+        "sunMinutesSavedPerDay": round_whole(minutes_saved_per_day(simulation.segments)),
+        "approximation": True,
+    }

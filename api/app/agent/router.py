@@ -6,5 +6,5 @@ router = APIRouter(tags=["agent"])
 
 
 @router.post("/agent/chat")
-async def chat_with_agent():
+async def chat_with_agent() -> None:
     raise not_implemented()

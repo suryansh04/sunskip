@@ -11,10 +11,9 @@ from app.contracts.models import Exposure
 from app.core.formulas import dose_weight, round_half_up, round_whole
 from app.core.geo import Point, line_length_m, sample_line
 from app.routes.walk import NO_SHADE_ROW, WalkPath
-from app.shade.tiles import NO_DATA, sun_bits
+from app.shade.tiles import NO_DATA, SHADE, sun_bits
 
 SECONDS_PER_MINUTE = 60
-SHADE = 0
 
 
 @dataclass
@@ -55,7 +54,9 @@ async def load_line_shade(coords: list[Point], month: int, spacing_m: float) -> 
     return LineShade(points, bits, line_length_m(coords) / len(points))
 
 
-def sum_sun(lengths: list[float], sun_share_at: Callable[[int, int], float], start_at: datetime, feels_like: dict):
+def sum_sun(
+    lengths: list[float], sun_share_at: Callable[[int, int], float], start_at: datetime, feels_like: dict
+) -> WalkSun:
     """Walks piece by piece; the clock (and so the hour) moves forward at walking speed."""
     walked_m, hot_minutes, peak = 0.0, 0.0, None
     sun_by_hour = defaultdict(float)

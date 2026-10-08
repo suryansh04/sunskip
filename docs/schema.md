@@ -113,14 +113,15 @@ Audio isn't stored in the database. It lives in S3 at `audio/{sha256(text|langua
 
 **`stretches`**
 
-- Neighbouring segments join into one stretch when the node between them has exactly 2 segments and their May 10:00 to 16:00 sun differs by less than 0.2.
+- Neighbouring segments join into one stretch when the node between them has exactly 2 segments in the whole walk graph and their May 10:00 to 16:00 sun differs by less than 0.2.
+- A rebuild covers the job's cells plus every other segment of any stretch it touches, so no segment is left without a stretch.
 - **Real example:** the ~430 m GHS footpath.
 
 **`stops` / `stop_shade`**
 
 - **Stops come from OSM:** bus stop, platform, or subway station. E-rickshaw stands are added by hand.
 - **Google stops** are matched to ours within 30 m.
-- **Shaded** = `has_shelter OR sun_fraction < 0.5`. An unmatched stop is `null`, and its wait counts as sun.
+- **Shaded** = `has_shelter OR sun_fraction < 0.5`. An unmatched stop, or a stop with no shelter and no shade data for that hour, is `null`, and its wait counts as sun.
 
 **`erickshaw_zones`**
 
@@ -219,6 +220,7 @@ DELETE FROM conditions_cache    WHERE expires_at < now() - interval '1 day';    
 | `REPRESENTATIVE_DAY`, `MIN_SUN_ELEVATION_DEG`                                | 15, 5                    | worker     |
 | `MAX_SEGMENT_M`, `STRETCH_SUN_DIFF`                                          | 50, 0.2                  | worker     |
 | `STOP_MATCH_M`, `GRAPH_SNAP_MAX_M`                                           | 30, 60                   | api        |
+| `STOP_SHADED_BELOW_SUN`                                                      | 0.5                      | api        |
 | `DEMAND_RADIUS_M`, `DEMAND_DECAY_M`                                          | 400, 150                 | demand job |
 | `PRIVACY_GRID_DEG`                                                           | 0.0005                   | api        |
 | `CORRIDOR_BUFFER_M`, `MAX_CELLS_PER_JOB`, `MAX_NEW_CELLS_PER_CLIENT_PER_DAY` | 100, 120, 60             | api        |

@@ -14,9 +14,16 @@ FASTEST_FIRST = 0.0  # rank by time and fare only, so Google's own route (not ou
 NOTE = "Bus times are not re-checked per slot."
 
 
+def clock_time(text: str) -> time:
+    try:
+        return time.fromisoformat(text)
+    except ValueError as error:
+        raise ApiError(400, "INVALID_REQUEST", f"{text} is not a time of day (HH:MM)") from error
+
+
 def slot_times(request: BestTimeRequest) -> list[datetime]:
-    start = datetime.combine(request.date, time.fromisoformat(request.from_), IST)
-    end = datetime.combine(request.date, time.fromisoformat(request.to), IST)
+    start = datetime.combine(request.date, clock_time(request.from_), IST)
+    end = datetime.combine(request.date, clock_time(request.to), IST)
     if end <= start or end - start > MAX_WINDOW:
         raise ApiError(400, "INVALID_REQUEST", "Pick a window that ends after it starts and is at most 14 hours")
     step = timedelta(minutes=request.step_minutes)
@@ -31,14 +38,18 @@ async def walk_lines(option: RouteOption) -> list[tuple[datetime, LineShade]] | 
     for leg in option.legs:
         if leg.mode != "WALK":
             continue
+        if not leg.shade_known:
+            return None
         line = await load_line_shade(leg.polyline["coordinates"], month, settings.shade_sample_spacing_m)
-        if not leg.shade_known or line is None:
+        if line is None:
             return None
         lines.append((leg.start_at, line))
     return lines
 
 
-def shade_slots(option: RouteOption, lines: list, slots: list[datetime], feels_like: dict) -> list[Slot]:
+def shade_slots(
+    option: RouteOption, lines: list[tuple[datetime, LineShade]], slots: list[datetime], feels_like: dict
+) -> list[Slot]:
     # Waiting stays the same minutes for every slot; it's counted in the hour of the first boarding
     first_boarding = next((leg.start_at for leg in option.legs if leg.wait_seconds is not None), None)
     wait_minutes = option.exposure.wait_sun_minutes or 0

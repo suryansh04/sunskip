@@ -9,7 +9,7 @@ logger = logging.getLogger(__name__)
 
 
 class ApiError(Exception):
-    def __init__(self, status: int, code: str, message: str, extra: dict | None = None):
+    def __init__(self, status: int, code: str, message: str, extra: dict | None = None) -> None:
         self.status = status
         self.code = code
         self.message = message
@@ -33,7 +33,8 @@ async def _handle_api_error(request: Request, error: ApiError) -> JSONResponse:
 async def _handle_validation_error(request: Request, error: RequestValidationError) -> JSONResponse:
     first = error.errors()[0]
     field = ".".join(str(part) for part in first["loc"][1:])
-    return error_response(request, 400, "INVALID_REQUEST", f"{field}: {first['msg']}")
+    message = f"{field}: {first['msg']}" if field else first["msg"]  # whole-body checks have no field
+    return error_response(request, 400, "INVALID_REQUEST", message)
 
 
 async def _handle_http_error(request: Request, error: HTTPException) -> JSONResponse:

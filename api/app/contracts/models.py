@@ -30,7 +30,7 @@ class PlaceInput(ApiModel):
     query: str | None = Field(default=None, min_length=2, max_length=200)
 
     @model_validator(mode="after")
-    def needs_point_or_query(self):
+    def needs_point_or_query(self) -> "PlaceInput":
         if self.query or (self.lat is not None and self.lng is not None):
             return self
         raise ValueError("send either lat and lng, or query")
@@ -209,7 +209,7 @@ class SimulatedItem(ApiModel):
     bearing_deg: float = Field(default=0, ge=0, lt=360)  # SHELTER: direction of its length
 
     @model_validator(mode="after")
-    def needs_size(self):
+    def needs_size(self) -> "SimulatedItem":
         if self.type == "TREE" and self.crown_radius_m:
             return self
         if self.type == "SHELTER" and self.width_m and self.length_m:
@@ -223,7 +223,7 @@ class SimulateRequest(ApiModel):
     items: list[SimulatedItem] = Field(min_length=1, max_length=MAX_SIMULATED_ITEMS)
 
     @model_validator(mode="after")
-    def valid_hours(self):
+    def valid_hours(self) -> "SimulateRequest":
         if 0 <= self.hours[0] <= self.hours[1] <= 23:
             return self
         raise ValueError("hours must be [from, to] with 0 <= from <= to <= 23")

@@ -14,6 +14,7 @@ from app.shade.tiles import NO_DATA, SUN, sun_bits
 
 COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
 TURN_DEG = 30
+FULL_TURN_DEG = 360
 
 
 async def load_option(trip_id: UUID, option_id: str) -> RouteOption:
@@ -39,7 +40,8 @@ def in_sun_at(bits: np.ndarray, index: int, start_at: datetime) -> bool | None:
 def turn_cue(bearing: float, previous: float | None) -> str | None:
     if previous is None:
         return None
-    turn = (bearing - previous + 540) % 360 - 180  # -180..180, positive = right
+    half_turn = FULL_TURN_DEG / 2
+    turn = (bearing - previous + half_turn) % FULL_TURN_DEG - half_turn  # -180..180, positive = right
     if abs(turn) < TURN_DEG:
         return None
     return "Turn right" if turn > 0 else "Turn left"
@@ -67,7 +69,7 @@ async def leg_waypoints(leg: Leg, leg_index: int, first_index: int, start_m: flo
                 location=LatLng(lat=point[1], lng=point[0]),
                 distance_from_start_m=start_m + index * settings.waypoint_spacing_m,
                 leg_index=leg_index,
-                bearing_deg=round(bearing),
+                bearing_deg=round(bearing) % FULL_TURN_DEG,  # 359.6 rounds to 0, not 360
                 in_sun=in_sun_at(bits, index, leg.start_at),
                 cue=cue,
             )

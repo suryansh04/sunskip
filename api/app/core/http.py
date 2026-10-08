@@ -1,4 +1,5 @@
 import logging
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 
 import httpx
@@ -23,7 +24,7 @@ def describe_error(error: Exception) -> str:
 
 
 @asynccontextmanager
-async def track_service(service: str):
+async def track_service(service: str) -> AsyncIterator[None]:
     try:
         yield
     except Exception as error:

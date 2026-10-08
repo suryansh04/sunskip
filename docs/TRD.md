@@ -430,7 +430,7 @@ export function logout() {
 | Geo             | `networkx`, `numpy`, `rasterio`, `shapely`, `pyproj`, `pvlib`         |
 | Outside calls   | `httpx` (Google, Open-Meteo, Overpass), `boto3` (S3, Secrets Manager) |
 | AI / voice (P2) | `anthropic`, `sarvamai`                                               |
-| Lint            | `ruff` (no test files; we test manually, see `CLAUDE.md`)             |
+| Lint            | `ruff`, type hints included (no test files; we test manually, see `CLAUDE.md`) |
 
 **Python version:** 3.12.
 

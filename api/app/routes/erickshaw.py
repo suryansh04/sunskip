@@ -1,6 +1,8 @@
 import math
 from datetime import datetime, timedelta
 
+import asyncpg
+
 from app.config import settings
 from app.contracts.models import Leg, RouteOption, Shade
 from app.db.walk_queries import find_erickshaw_zone
@@ -14,7 +16,7 @@ def worth_swapping(leg: Leg) -> bool:
     return leg.distance_meters > settings.swap_min_walk_m or (hot_minutes or 0) > settings.swap_min_hot_sun_min
 
 
-def erickshaw_leg(walk: Leg, zone) -> Leg:
+def erickshaw_leg(walk: Leg, zone: asyncpg.Record) -> Leg:
     duration = round(walk.distance_meters / settings.erickshaw_speed_mps + settings.erickshaw_wait_seconds)
     fare = zone["base_fare_inr"] + zone["per_km_inr"] * math.ceil(walk.distance_meters / METERS_PER_KM)
     return Leg(
