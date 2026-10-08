@@ -69,7 +69,7 @@ Audio isn't stored in the database. It lives in S3 at `audio/{sha256(text|langua
 4. **Then cells, 4 at a time.** For each cell:
    - check the monthly budget in `solar_usage`;
    - call Solar `dataLayers:get` at the cell centre (radius 100 m);
-   - save all 12 monthly files + DSM to S3;
+   - save all 12 monthly files to S3 (and a local cache), pacing downloads under Google's 180-a-minute limit;
    - set the status to `READY`.
    - A Solar 404 gives `NO_DATA`. Over budget gives `BUDGET_EXCEEDED`. 3 failures give `ERROR`.
 5. **Score.** Fill `segment_shade` / `stop_shade` for every segment and stop that is now fully covered, set `segments.shade_ready = true`, and rebuild stretches for that area.
@@ -221,7 +221,7 @@ DELETE FROM conditions_cache    WHERE expires_at < now() - interval '1 day';    
 | `DEMAND_RADIUS_M`, `DEMAND_DECAY_M`                                          | 400, 150                 | demand job |
 | `PRIVACY_GRID_DEG`                                                           | 0.0005                   | api        |
 | `CORRIDOR_BUFFER_M`, `MAX_CELLS_PER_JOB`, `MAX_NEW_CELLS_PER_CLIENT_PER_DAY` | 100, 120, 60             | api        |
-| `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`, `OVERPASS_URL`      | 6500, 4, public Overpass | worker     |
+| `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`, `OVERPASS_URLS`     | 6500, 4, public Overpass | worker     |
 
 ---
 
@@ -249,7 +249,7 @@ CREATE TABLE shade_cells (
                      CHECK (status IN ('PENDING','FETCHING','READY','NO_DATA','ERROR','BUDGET_EXCEEDED')),
     imagery_date     date,
     imagery_quality  text        CHECK (imagery_quality IN ('HIGH','MEDIUM','BASE')),
-    s3_prefix        text        UNIQUE,     -- s3://bucket/shade/<geohash>/ holds month_01.tif .. month_12.tif + dsm.tif
+    s3_prefix        text        UNIQUE,     -- s3://bucket/shade/<geohash>/ holds month_01.tif .. month_12.tif
     attempts         smallint    NOT NULL DEFAULT 0,
     last_error       text,
     requested_at     timestamptz NOT NULL DEFAULT now(),

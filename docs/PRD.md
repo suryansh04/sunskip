@@ -170,6 +170,7 @@
 **For the hackathon:**
 
 - **Pilot numbers match:** the deployed API shows 11.3 min at 1 PM and 7.4 at 5 PM for the May pilot walk.
+  - Measured locally (9 Oct): **11.3 at 1 PM** exactly; **7.6 at 5 PM**. Every hour is within ±0.2 of the table. The shade files agree with the pilot CSV on all 163 points every hour; the small gap is because the line Google returns today sits up to 1.4 m off the pilot's points.
 - **"Anywhere" works live:** a trip in a city we never preloaded goes from "preparing" to the shadiest route within about a minute.
 - **AR works live:** arrows follow a real route on one Android and one iPhone.
 - **Fast:** plan under 3 s, agent under 15 s. Everything is under API Gateway's 29 s limit (verified).
