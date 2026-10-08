@@ -186,7 +186,8 @@ POI weights and distances are guesses, labelled as estimates in the portal.
 | Process                                                | When                                         | What                                   |
 | ------------------------------------------------------ | -------------------------------------------- | -------------------------------------- |
 | `worker` (`python -m app.worker`)                      | always on                                    | Shade jobs (§3)                        |
-| Demand job (`app/worker/demand.py`, run by the worker) | nightly 02:00 IST                            | Rewrites `demand_estimates`            |
+| Demand job (`app/worker/demand.py`, run by the worker) | nightly 02:00 IST; by hand: `python -m app.worker.demand` | Rewrites `demand_estimates`            |
+| Stretches (`app/worker/stretches.py`)                  | after every shade job; by hand: `python -m app.worker.stretches` | Rebuilds `stretches` for those cells |
 | Cleanup (in the api)                                   | trips every 10 min; the rest daily 03:00 IST | SQL below                              |
 | `scripts/preload.py`                                   | before a demo                                | Queues `PRELOAD` jobs for chosen areas |
 

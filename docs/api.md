@@ -106,7 +106,7 @@ PlaceInput  { lat, lng } | { query }              // query is looked up by Googl
 Shade       { status: "READY" | "PREPARING" | "UNAVAILABLE", jobId | null,
               cellsTotal?, cellsDone?, pollAfterSeconds? }
             // READY: shade data present · PREPARING: a job is running, poll it
-            // UNAVAILABLE: Google has no shade data here, or our monthly budget is used up
+            // UNAVAILABLE: Google has no shade data here, our monthly budget is used up, or it's outside India
 
 Exposure    { walkMeters, walkMinutes,
               sunMinutes | null,        // minutes walking in direct sun
@@ -566,7 +566,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Map endpoints** (14 heat-pain, 15 recommendations) need `bbox` (max 25 km²). Stats and stretch detail don't.
 - **Defaults:** `month=5`, `hours=10-16` (May midday is the worst case).
-- **Missing cells** in the bbox (or around simulated items) are queued as a `PORTAL` job (max 120 cells per call).
+- **Missing cells** in the bbox (or within 60 m of simulated items) are queued as a `PORTAL` job (max 120 cells per call). Nothing is queued outside India.
+- **Walkers** come from the demand job (nightly at 02:00 IST, or by hand with `python -m app.worker.demand`). A brand-new area has none until it runs, so its pain scores are `null`.
 - **If nothing in the area is ready yet:** `409 SHADE_PREPARING`.
 
 ### 13. `GET /portal/stats?from=&to=`
@@ -642,8 +643,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **Real:** 0% shade, exposed 9 AM to 4 PM in May.
 - **How:**
   - Take the top 20 stretches.
-  - Place trees every 8 m, and shelters at stops and stretch midpoints.
-  - Simulate each (endpoint 16).
+  - Trees: every 8 m along the stretch (6 m tall, 3 m crown; at most 50). Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
+  - Simulate each (endpoint 16) and count only the sun saved on that stretch.
   - Pick the best by walkers × minutes saved ÷ cost.
 - Costs (₹3,000 per tree, ₹60,000 per shelter) are estimates. `reason` is a template, not an LLM.
 
@@ -689,7 +690,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
   - pvlib gives the sun position on day 15 of the month.
   - The shadow is the crown (or roof), moved by `height ÷ tan(elevation)` away from the sun.
   - Points inside the shadow become shade.
-- **Limits:** max 50 items. It ignores trunks, canopy gaps and growth time.
+- **Limits:** max 50 items. It ignores trunks, canopy gaps and growth time. Only paths within 60 m of an item are checked. A TREE needs `crownRadiusM`; a SHELTER needs `widthM` and `lengthM` (`bearingDeg` is the direction of its length).
+- **`segments`** lists only the segments whose sun changed.
 - **Errors:** `409` while preparing; `422 NO_SHADE_DATA`.
 
 ### 17. `GET /portal/stretches/{stretchId}`
@@ -819,6 +821,9 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `COOLER_PATH_MIN_SAVING_MIN`, `SOLAR_GEOTIFFS_PER_MINUTE`                                            | 1.0, 150                                  |
 | `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600                       |
 | `ORIGIN_SECRET_CHECK`                                                                                | true (false only locally)                 |
+| `MAX_PORTAL_BBOX_KM2`, `SIMULATION_REACH_M`                                                          | 25, 60                                    |
+| `TREE_HEIGHT_M`, `TREE_CROWN_RADIUS_M`, `SHELTER_WIDTH_M`, `SHELTER_LENGTH_M`, `SHELTER_HEIGHT_M`    | 6, 3, 3, 6, 3                             |
+| `STRETCH_SUN_DIFF`, `DEMAND_RADIUS_M`, `DEMAND_DECAY_M`                                              | 0.2, 400, 150                             |
 
 More settings for the database and worker are in `schema.md` §8.
 
