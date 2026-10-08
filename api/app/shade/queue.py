@@ -10,6 +10,7 @@ from app.db.shade_queries import (
 )
 from app.db.status_queries import get_solar_calls_this_month
 
+INDIA_BBOX = (68.1, 6.5, 97.5, 35.7)  # west, south, east, north; a rough box around India
 IN_PROGRESS = {"PENDING", "FETCHING"}
 DONE = {"READY", "NO_DATA"}
 
@@ -33,8 +34,22 @@ async def can_queue(client_hash: str | None, new_cells: int) -> bool:
     return already_today + new_cells <= settings.max_new_cells_per_client_per_day
 
 
+def points_of(coordinates: list) -> list[list[float]]:
+    """Every [lng, lat] in any GeoJSON geometry's (nested) coordinates."""
+    if coordinates and isinstance(coordinates[0], int | float):
+        return [coordinates]
+    return [point for part in coordinates for point in points_of(part)]
+
+
+def inside_india(area: dict) -> bool:
+    west, south, east, north = INDIA_BBOX
+    return all(west <= lng <= east and south <= lat <= north for lng, lat in points_of(area["coordinates"]))
+
+
 async def ensure_shade(area: dict, buffer_m: float, reason: str, client_hash: str | None) -> Shade:
     """Checks shade data around `area` (GeoJSON). Queues a job for what's missing; never waits."""
+    if not inside_india(area):
+        return Shade(status="UNAVAILABLE")  # v1 is India only: never spend Solar calls elsewhere
     cells, areas = await find_cells_and_areas(area, buffer_m)
     cell_statuses = await get_cell_statuses(cells)
     in_progress = [cell for cell in cells if cell_statuses.get(cell) in IN_PROGRESS]

@@ -2,9 +2,11 @@
 
 import asyncio
 from collections import defaultdict
+from functools import cache, lru_cache
 
 import numpy as np
 import rasterio
+from affine import Affine
 from pyproj import Transformer
 
 from app.config import settings
@@ -16,6 +18,7 @@ HOURS = 24
 CELL_PRECISION = 7
 NO_DATA = -1
 SUN = 1
+CACHED_TILES = 32  # ~5 MB each decoded, so about 160 MB at most
 
 
 def cell_of(point: Point) -> str:
@@ -29,15 +32,33 @@ def group_by_cell(points: list[Point]) -> dict[str, list[int]]:
     return cells_of_points
 
 
+@cache
+def transformer_to(crs: str) -> Transformer:
+    return Transformer.from_crs("EPSG:4326", crs, always_xy=True)
+
+
+@lru_cache(maxsize=CACHED_TILES)
+def load_tile(geohash: str, month: int) -> tuple[np.ndarray, np.ndarray, Affine, str]:
+    """(values, no-data mask, transform, crs) of one saved month file. Saved files never change, so caching is safe;
+    decoding is the slow part (~25 ms), and neighbouring requests keep asking for the same tiles."""
+    with rasterio.open(local_path(f"shade/{geohash}/month_{month:02d}.tif")) as tile:
+        bands = tile.read(masked=True)  # all 24 hours at once; far faster than sampling point by point
+        return bands.data, np.ma.getmaskarray(bands), tile.transform, tile.crs.to_string()
+
+
 def read_sun_bits(geohash: str, month: int, points: list[Point]) -> np.ndarray:
     """(len(points), 24) of 1 = sun, 0 = shade, -1 = no data, for the representative day."""
-    with rasterio.open(local_path(f"shade/{geohash}/month_{month:02d}.tif")) as tile:
-        to_tile = Transformer.from_crs("EPSG:4326", tile.crs, always_xy=True)
-        xs, ys = to_tile.transform([point[0] for point in points], [point[1] for point in points])
-        values = np.ma.array(list(tile.sample(zip(xs, ys, strict=True), masked=True)))
+    data, mask, transform, crs = load_tile(geohash, month)
+    xs, ys = transformer_to(crs).transform([point[0] for point in points], [point[1] for point in points])
+    rows, cols = (np.asarray(index) for index in rasterio.transform.rowcol(transform, xs, ys))
+    inside = (rows >= 0) & (rows < data.shape[1]) & (cols >= 0) & (cols < data.shape[2])
+    values = np.zeros((len(points), HOURS), dtype=np.uint32)
+    missing = np.ones((len(points), HOURS), dtype=bool)
+    values[inside] = data[:, rows[inside], cols[inside]].T
+    missing[inside] = mask[:, rows[inside], cols[inside]].T
     # Careful: in Solar's data a set bit means SUN. Bit (day - 1) is that day of the month
-    sun = ((values.astype(np.uint32) >> (settings.representative_day - 1)) & 1).astype(np.int8)
-    return np.where(np.ma.getmaskarray(values), NO_DATA, sun).astype(np.int8)
+    sun = ((values >> (settings.representative_day - 1)) & 1).astype(np.int8)
+    return np.where(missing, NO_DATA, sun).astype(np.int8)
 
 
 def month_bits(points: list[Point], cells_of_points: dict[str, list[int]], statuses: dict, month: int) -> np.ndarray:

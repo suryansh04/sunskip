@@ -5,6 +5,7 @@ from app.db.shade_queries import finish_job
 from app.worker.overpass import load_osm_area
 from app.worker.scoring import score_cells
 from app.worker.solar import fetch_cells
+from app.worker.stretches import rebuild_stretches
 
 logger = logging.getLogger("worker")
 
@@ -17,9 +18,16 @@ async def load_osm_areas(areas: list[str]) -> None:
 async def run_job(job) -> None:
     logger.info("Job %s: %d areas, %d cells", job["id"], len(job["osm_areas"]), len(job["cells"]))
     try:
-        # OSM and Solar don't depend on each other, so fetch both at once; scoring needs both
-        await asyncio.gather(load_osm_areas(job["osm_areas"]), fetch_cells(job["id"], job["cells"]))
+        # OSM and Solar don't depend on each other, so fetch both at once. Wait for both before
+        # failing, so no downloads keep running after this job is marked FAILED
+        results = await asyncio.gather(
+            load_osm_areas(job["osm_areas"]), fetch_cells(job["id"], job["cells"]), return_exceptions=True
+        )
+        errors = [result for result in results if isinstance(result, BaseException)]
+        if errors:
+            raise errors[0]
         await score_cells(job["cells"])
+        await rebuild_stretches(job["cells"])
     except Exception as error:
         logger.exception("Job %s failed", job["id"])
         await finish_job(job["id"], "FAILED", type(error).__name__)

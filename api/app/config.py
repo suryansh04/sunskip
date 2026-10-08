@@ -44,6 +44,18 @@ class Settings(BaseSettings):
     erickshaw_wait_seconds: int = 120
     waypoint_spacing_m: float = 25
 
+    # Portal (api.md §8, §11); costs are estimates
+    max_portal_bbox_km2: float = 25
+    tree_spacing_m: float = 8
+    tree_cost_inr: int = 3000
+    shelter_cost_inr: int = 60000
+    tree_height_m: float = 6
+    tree_crown_radius_m: float = 3
+    shelter_width_m: float = 3
+    shelter_length_m: float = 6
+    shelter_height_m: float = 3
+    simulation_reach_m: float = 60  # segments this close to an item can get its shadow
+
     # Shade data (api.md §11, schema.md §8)
     corridor_buffer_m: float = 100
     max_cells_per_job: int = 120
@@ -59,14 +71,16 @@ class Settings(BaseSettings):
     representative_day: int = 15
     min_sun_elevation_deg: float = 5
     max_segment_m: float = 50
+    stretch_sun_diff: float = 0.2
     shade_sample_spacing_m: float = 5
     stop_match_m: float = 30
     graph_snap_max_m: float = 60
     privacy_grid_deg: float = 0.0005
+    demand_radius_m: float = 400
+    demand_decay_m: float = 150
     poll_after_seconds: int = 3
 
     # Worker and api background loops
-    stuck_after_minutes: int = 10
     heartbeat_interval_s: float = 30
     worker_idle_sleep_s: float = 2
     cleanup_interval_s: float = 600

@@ -10,7 +10,7 @@ from app.db.cache_queries import conditions_cell_id, read_conditions_cache, writ
 FORECAST_URL = "https://api.open-meteo.com/v1/forecast"
 ARCHIVE_URL = "https://archive-api.open-meteo.com/v1/archive"
 HOURLY_FIELDS = "temperature_2m,apparent_temperature"
-FORECAST_PAST_DAYS = 2
+FORECAST_PAST_DAYS = 31  # the archive lags ~5 days, so recent past days come from the forecast API
 FORECAST_AHEAD_DAYS = 7
 FORECAST_DAYS = 9  # today + 8, so a trip on day +7 still has 24 hours ahead
 FORECAST_TTL_MIN = 15
