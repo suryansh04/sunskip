@@ -337,9 +337,9 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
    - If any cells are missing, queue **one** `PLAN` job for the trip (max 120 cells; max 60 new cells per client per day) and mark those legs `shadeKnown: false`.
    - **Don't wait.**
 3. **Walk legs with shade:**
-   - Build a small graph from the shade-ready segments in the corridor.
-   - Find the path with the lowest cost: `length × (1 + 3.0 × sun_fraction × heatWeight)`.
-   - Keep it only if it is at most 1.3× the shortest path's length.
+   - Score Google's walking line directly: sample it every 5 m and read each point's sun bit from the Solar files, with the hour moving forward at 1.2 m/s. This is exactly how the pilot walk was measured.
+   - Also search our own shadiest path: a small graph of the shade-ready OSM segments in the corridor, with cost `length × (1 + 3.0 × sun_fraction × heatWeight)` at the start hour, kept only if it's at most 1.3× the shortest path.
+   - If our path saves at least 1 sun minute (`COOLER_PATH_MIN_SAVING_MIN`), add a copy of the option that walks it instead.
    - Then compute `Exposure`.
 4. **Transit legs:**
    - **Map Google's vehicle types:** `BUS` → BUS; `SUBWAY`, `METRO_RAIL`, `TRAM`, `MONORAIL` → METRO; `RAIL`, `HEAVY_RAIL`, `COMMUTER_TRAIN`, `HIGH_SPEED_TRAIN`, `LONG_DISTANCE_TRAIN` → RAIL; anything else → BUS.
@@ -439,7 +439,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **Real:** 11.3 min at 1 PM and 7.4 min at 5 PM in May. The doses assume an example 5 min wait and feels-like 44 °C / 41 °C.
-- **How it works:** plan once, then re-score the top option for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls.
+- **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Waiting minutes stay the same for every slot.
 - **No shade data:** `basis: "TEMPERATURE_ONLY"`, `sunMinutes: null`. Slots are ranked by `walkMinutes × max(heatWeight, 0.1)` while the sun is ≥ 5° up. This is labelled as an estimate.
 
 ### 7. `GET /routes/{tripId}/options/{optionId}/waypoints?language=en-IN`
@@ -463,7 +463,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 }
 ```
 
-- **`inSun`** is for the expected arrival time. It is `null` if shade is unknown; AR draws that part grey.
+- **`inSun`** is read from the Solar files at that point for the expected arrival time. It is `null` if shade is unknown; AR draws that part grey.
+- **`cue`** is English in v1; `language` is accepted for later (P2's voice code translates).
 - **`cue`** is set at the start of each leg and at turns of 30° or more.
 - **404** if the trip has expired.
 
@@ -782,7 +783,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Request:** `dataLayers:get` with radius 100 m, `requiredQuality=BASE`, `view=FULL_LAYERS`. This returns a 200 × 200 m tile at 1 m per pixel.
 - **Hourly shade:** 12 monthly files, each with 24 bands (local hours = IST). Bit `day − 1` is that day. **A set bit means SUN** (checked on our run).
-- **Download links expire in about 1 hour,** so the worker saves all 12 months + DSM to S3 at once.
+- **Download links expire in about 1 hour,** so the worker saves all 12 monthly files to S3 at once (the DSM isn't used in v1, so it isn't downloaded).
+- **GeoTIFF download limit (verified):** 180 per minute per project. The worker paces downloads at 150 a minute (`SOLAR_GEOTIFFS_PER_MINUTE`); a 429 waits a minute and retries just that file. A new cell takes about 5 s.
 - **Only the worker calls Solar,** once per map cell, ever.
 - **Coverage isn't guaranteed.** Google's map is an estimate, and a 404 marks the cell `NO_DATA`.
 - **Cost (India):**
@@ -813,7 +815,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `TREE_SPACING_M`, `TREE_COST_INR`, `SHELTER_COST_INR`                                                | 8, 3000, 60000                            |
 | `CORRIDOR_BUFFER_M`, `MAX_CELLS_PER_JOB`, `MAX_NEW_CELLS_PER_CLIENT_PER_DAY`                         | 100, 120, 60                              |
 | `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`                                              | 6500, 4                                   |
-| `OVERPASS_URL`                                                                                       | `https://overpass-api.de/api/interpreter` |
+| `OVERPASS_URLS` (tried in order; the main server is often busy)                                      | overpass-api.de, then maps.mail.ru        |
+| `COOLER_PATH_MIN_SAVING_MIN`, `SOLAR_GEOTIFFS_PER_MINUTE`                                            | 1.0, 150                                  |
 | `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600                       |
 | `ORIGIN_SECRET_CHECK`                                                                                | true (false only locally)                 |
 

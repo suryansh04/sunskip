@@ -590,10 +590,10 @@ services:
         POSTGRES_USER: sunskip,
         POSTGRES_PASSWORD: sunskip,
       }
-    ports: ["5432:5432"]
+    ports: ["5433:5432"] # 5433 so it never clashes with a Postgres already installed on the laptop
 ```
 
-- Run `docker compose -f docker-compose.dev.yml up -d`, then set `DATABASE_URL=postgresql://sunskip:sunskip@localhost:5432/sunskip` in your local `.env` and run `python -m scripts.migrate`.
+- Run `docker compose -f docker-compose.dev.yml up -d`, then set `DATABASE_URL=postgresql://sunskip:sunskip@localhost:5433/sunskip` in your local `.env` and run `python -m scripts.migrate`.
 - Run the api with `uvicorn app.main:app --reload` and the worker with `python -m app.worker`. Locally set `ORIGIN_SECRET_CHECK=false` and leave `SECRET_ID` empty: `config.py` reads env vars first and only calls Secrets Manager when `SECRET_ID` is set.
 - The image is amd64 only; on an Apple-silicon Mac it runs slower through emulation.
 
