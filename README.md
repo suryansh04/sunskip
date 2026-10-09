@@ -1,8 +1,18 @@
-# SunSkip setup and verification
+# SunSkip
 
-How to run SunSkip on your laptop, how the live system is deployed and updated, and what has been checked. Every command here was run on 9 Oct 2026 from a fresh clone of `github.com/suryansh04/sunskip` (Windows 11, PowerShell and Git Bash); the results are in [§6](#6-verification-record).
+Walking and transit routes with the least direct sun, anywhere in India, plus a portal that shows city officials where trees and shelters would cut the most sun for the most walkers. Shade comes from Google Solar's hourly shade maps, routes from Google Routes, paths and stops from OpenStreetMap.
 
-For what we build and why, read `PRD.md`; for the stack and rules, `TRD.md` and `CLAUDE.md`; for endpoints, `api.md`; for tables, `schema.md`.
+Pilot: the 810 m walk from Manipal University Jaipur to the Bus 26 stop is in direct sun for **11.3 minutes at 1 PM** and **7.4 minutes at 5 PM** in May (measured); SunSkip finds the times and paths that cut that.
+
+This README covers how to run SunSkip on your laptop, how the live system is deployed and updated, and what has been checked. Every command here was run on 9 Oct 2026 from a fresh clone of this repo (Windows 11, PowerShell and Git Bash); the results are in [§6](#6-verification-record).
+
+| Doc                                  | What's in it                                  |
+| ------------------------------------ | --------------------------------------------- |
+| [`docs/PRD.md`](docs/PRD.md)         | what we build and why                         |
+| [`docs/TRD.md`](docs/TRD.md)         | stack, allowed packages, infrastructure       |
+| [`docs/api.md`](docs/api.md)         | the 18 endpoints, data shapes, formulas       |
+| [`docs/schema.md`](docs/schema.md)   | every table and the `0001_init` SQL           |
+| [`CLAUDE.md`](CLAUDE.md)             | team rules every contributor follows          |
 
 ## 1. What works today
 
