@@ -10,6 +10,7 @@ The docs in `docs/` are a **reference, not a contract to follow line by line** (
 - `docs/TRD.md`: stack, allowed packages, code rules, setup, deploy
 - `docs/api.md`: the 18 endpoints, data shapes, formulas
 - `docs/schema.md`: every table and the `0001_init` SQL
+- `docs/design.md`: colours, font, icons, map style and every app screen
 - `README.md`: what SunSkip is, how it's built, and how to set it up locally
 
 If the code and the docs disagree, stop and ask. Don't guess. Keep the docs updated so they always describe what the code actually does.
