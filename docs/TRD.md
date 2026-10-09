@@ -28,7 +28,7 @@ worker → Google Solar (shade), Overpass (OpenStreetMap)
 | Part                           | Owner                                                     | Folder                             |
 | ------------------------------ | --------------------------------------------------------- | ---------------------------------- |
 | API + worker + infra           | Suryansh (P1)                                             | `api/`                             |
-| Student app                    | Suryansh (P1); chat/voice components by P2; AR view by P3 | `app/`                             |
+| Student app (all screens + AR) | Person 3; chat/voice components by P2                     | `app/`                             |
 | Officials portal               | Suryansh (P1)                                             | `portal/`                          |
 | Agent + voice (inside the API) | Person 2                                                  | `api/app/agent`, `api/app/voice`   |
 
@@ -50,6 +50,7 @@ worker → Google Solar (shade), Overpass (OpenStreetMap)
 | HTTP           | `axios@1` (one shared client)                                                                                                 |
 | Map            | `maplibre-gl@5`, used directly inside `useEffect`                                                                             |
 | Install as app | `vite-plugin-pwa@1` (app only)                                                                                                |
+| Icons          | `@phosphor-icons/react@2` (Bold weight; see design.md)                                                                        |
 | AR (P3 only)   | `locar@0.2.12` (exact) + `three@0.181.x`                                                                                      |
 
 > **Why these versions:** newer majors exist (Vite 8, React Router 8, TypeScript 7), but they are new and less documented. Stay on the lines above. LocAR needs `three` 0.181.x exactly.
@@ -145,7 +146,7 @@ export default function MapView({ center, geojson, colorBy }) {
   useEffect(() => {
     const map = new maplibregl.Map({
       container: box.current,
-      style: import.meta.env.VITE_MAP_STYLE_URL, // https://tiles.openfreemap.org/styles/liberty
+      style: import.meta.env.VITE_MAP_STYLE_URL, // https://tiles.openfreemap.org/styles/positron, recoloured as in design.md §6
       center,
       zoom: 15,
     });
@@ -206,11 +207,11 @@ The whole project is one repo:
 
 ```
 sunskip/                    (repo root)
-  docs/                     PRD, TRD, api, schema
+  docs/                     PRD, TRD, api, schema, design
   api/                      FastAPI + worker (§5.2)
   app/                      student app (below)
   portal/                   officials portal (below)
-  .github/workflows/        CI: api job runs when api/** changes; app/portal jobs when their folder changes
+  .github/workflows/        CI: ruff for api on every push to main and every pull request; add npm build jobs for app and portal when they exist
   .gitignore
 ```
 
@@ -255,7 +256,8 @@ app/                                 portal/
     "react-dom": "^19.2.0",
     "react-router": "^7.18.0",
     "axios": "^1.20.0",
-    "maplibre-gl": "^5.24.0"
+    "maplibre-gl": "^5.24.0",
+    "@phosphor-icons/react": "^2.1.10"
   },
   "devDependencies": {
     "vite": "^7.3.0",
@@ -337,19 +339,24 @@ export default defineConfig({
 
 ## 3. Student app (`app/`)
 
-| Route                        | Screen                                                                                                  | Calls                                       | Notes                                                     |
-| ---------------------------- | ------------------------------------------------------------------------------------------------------- | ------------------------------------------- | --------------------------------------------------------- |
-| `/`                          | **Home:** from/to inputs (GPS button + text), depart time, cheap ↔ cool slider, heat banner             | `GET /meta`, `GET /conditions`              | Banner turns red at feels-like ≥ 40 °C                    |
-| `/results`                   | **Route cards:** fastest / cheapest / coolest, sun minutes per walk, warnings, map of the chosen option | `POST /routes/plan`, `GET /shade/jobs/{id}` | "Preparing shade data… 6/18" bar, auto re-plan (§2.5)     |
-| `/best-time`                 | **Best time:** one bar per slot (sun minutes), best slot highlighted                                    | `POST /routes/best-time`                    | Label `TEMPERATURE_ONLY` results as "estimate"            |
-| `/map`                       | **Shade map:** month + hour sliders, lines blue → orange                                                | `GET /shade/segments`                       | Re-fetch when the map stops moving (`moveend`), max 1 km² |
-| `/trip/:tripId/:optionId/ar` | **AR walk** (P3)                                                                                        | waypoints endpoint                          | Mounted from `features/ar`                                |
-| (panel on every page)        | **Ask SunSkip** chat + mic (P2)                                                                         | `/agent/chat`, `/voice/*`                   | Mounted from `features/agent`, `features/voice`           |
+The screens, states, colours, font, icons and map style are in [design.md](design.md) (25 screens; clickable prototype at https://sunskip-ui.vercel.app). The routes below are a suggested split:
+
+| Route                        | Screen                                                                                                                  | Calls                                          | Notes                                                     |
+| ---------------------------- | ----------------------------------------------------------------------------------------------------------------------- | ---------------------------------------------- | --------------------------------------------------------- |
+| `/`                          | **Home:** shade map around you, heat chip (opens heat details), "Where to?", Leave now / Leave at / Arrive by, recents | `GET /meta`, `GET /conditions`, `GET /shade/segments` | Heat chip turns red at feels-like ≥ 40 °C          |
+| `/search`                    | **Destination search** and pick on the map                                                                              | none yet (needs an autocomplete source)        | Send map points to the API when you can                   |
+| `/results`                   | **Route options:** one card per option (mode chain, walking sun, waiting sun, time, fare, labels), warnings            | `POST /routes/plan`, `GET /shade/jobs/{id}`    | "Preparing shade data… 13 of 45" card, auto re-plan (§2.5) |
+| `/results/:optionId`         | **Option detail:** legs timeline (walks, waits with stop shade, rides), "Take this route"                               | plan response + waypoints                      |                                                           |
+| `/walk`                      | **Walk detail:** sun strip, "Leave later" hour bars, e-rickshaw and shadier path                                        | `POST /routes/best-time`                       |                                                           |
+| `/best-time`                 | **Best time:** one bar per slot (sun minutes), best slot highlighted                                                    | `POST /routes/best-time`                       | Label `TEMPERATURE_ONLY` results as "estimate"            |
+| `/map`                       | **Shade map:** hour slider, lines blue → orange                                                                         | `GET /shade/segments`                          | Re-fetch when the map stops moving (`moveend`), max 1 km² |
+| `/trip/:tripId/:optionId`    | **Navigate:** map with instruction, spoken directions, Map / AR switch, 2D arrow backup; AR from `features/ar` (P3)     | waypoints endpoint, `/voice/instructions`      |                                                           |
+| (from Home and Results)      | **Ask SunSkip** chat + mic (P2)                                                                                         | `/agent/chat`, `/voice/*`                      | Mounted from `features/agent`, `features/voice`           |
 
 - **On "Start" tap:** `POST /routes/{tripId}/choice`, then voice directions.
 - **Plan state:** keep the last plan request in `useState` on `/results` so a re-plan sends the same body.
 - **Mobile first:** design for 360 px wide; one column; big tap targets (`py-3`).
-- **Colours:** shade `#2F80ED`, sun `#F2994A`, alert `#B91C1C`. The same colours are used in the map, cards and AR.
+- **Colours, font and icons:** see design.md. Shade `#2F80ED`, sun `#F2994A`, alert `#B91C1C`; the same colours are used in the map, cards and AR. Font: Mona Sans (Google Fonts) with Noto Sans Devanagari for Hindi.
 
 ---
 
@@ -516,7 +523,7 @@ api/
 - **CORS lives in API Gateway only.** Don't add CORS in FastAPI too, or the headers get doubled.
 - **Cost:** about $3/day from the free-plan credits (EC2 ~$2.3, RDS ~$0.7). Stop EC2 and RDS when they're not needed after the hackathon.
 - **Live (deployed 9 Oct):** API `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1`, bucket `sunskip-shade-056362973989`, database `sunskip-db`, secret `sunskip/prod`, Cognito domain `sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com`. Containers must reach the instance role, so the EC2 metadata hop limit is 2.
-- **How it was deployed:** the repo has no GitHub remote yet, so the code went up as a `git archive` of `api/` in S3 and was set up on the server through Systems Manager; the local database was copied as a data-only `pg_dump` of the shade, map and demand tables (no request logs) and the shade files with `aws s3 sync`, so no Solar calls were spent again.
+- **How it was deployed:** the code goes up as a `git archive` of `api/` from `main` to S3 and is set up on the server through Systems Manager (§8.2). For the first deploy, the local database was copied as a data-only `pg_dump` of the shade, map and demand tables (no request logs) and the shade files with `aws s3 sync`, so no Solar calls were spent again.
 
 ### 8.1 Deploy the API + worker (Docker on EC2)
 
@@ -727,7 +734,7 @@ Start them again with `start-instances` and `start-db-instance`; the containers 
 | ----------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
 | app, portal | `VITE_API_BASE_URL`                             | `/v1` locally (Vite forwards it); `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1` on Amplify |
 | app, portal | `VITE_USE_MOCKS`                                | `true` locally until the API is up                                                                    |
-| app, portal | `VITE_MAP_STYLE_URL`                            | `https://tiles.openfreemap.org/styles/liberty`                                                        |
+| app, portal | `VITE_MAP_STYLE_URL`                            | `https://tiles.openfreemap.org/styles/positron`                                                       |
 | portal      | `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID` | from Cognito                                                                                          |
 | api         | settings list                                   | `api.md` §11 and `schema.md` §8                                                                       |
 
