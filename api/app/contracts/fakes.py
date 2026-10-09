@@ -22,18 +22,8 @@ def fake_conditions() -> dict:
     }
 
 
-def fake_plan() -> dict:
-    walk_exposure = {
-        "walkMeters": 810,
-        "walkMinutes": 11.3,
-        "sunMinutes": 11.3,
-        "sunMinutesHot": 11.3,
-        "waitSunMinutes": None,
-        "shadePct": 0,
-        "heatDose": 20.3,
-        "feelsLikeC": 44.0,
-    }
-    walk_leg = {
+def fake_walk_leg(walk_exposure: dict) -> dict:
+    return {
         "mode": "WALK",
         "from": {"name": None, "location": PILOT_START},
         "to": {"name": "Bus 26 stop", "location": BUS_26_STOP},
@@ -45,6 +35,19 @@ def fake_plan() -> dict:
         "shadeKnown": True,
         "coverage": "FULL",
         "exposure": walk_exposure,
+    }
+
+
+def fake_plan() -> dict:
+    walk_exposure = {
+        "walkMeters": 810,
+        "walkMinutes": 11.3,
+        "sunMinutes": 11.3,
+        "sunMinutesHot": 11.3,
+        "waitSunMinutes": None,
+        "shadePct": 0,
+        "heatDose": 20.3,
+        "feelsLikeC": 44.0,
     }
     return {
         "tripId": str(uuid.uuid4()),
@@ -59,7 +62,7 @@ def fake_plan() -> dict:
                 "durationSeconds": 675,
                 "fareInr": 0,
                 "exposure": {**walk_exposure, "waitSunMinutes": 0.0},
-                "legs": [walk_leg],
+                "legs": [fake_walk_leg(walk_exposure)],
                 "warnings": ["HEAT_ALERT"],
             }
         ],

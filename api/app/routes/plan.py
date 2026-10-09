@@ -19,6 +19,7 @@ from app.shade.queue import ensure_shade
 
 FAILED_STATUSES = {422: "NO_ROUTE_FOUND", 502: "UPSTREAM_ERROR"}
 WALK_ONLY_FARE_INR = 0
+MS_PER_SECOND = 1000
 
 
 async def fetch_google_routes(request: PlanRequest, google_time: datetime) -> tuple[list[dict], list[dict]]:
@@ -144,7 +145,7 @@ async def save_plan(
             top_option_id=top.option_id,
             top_sun_minutes=top.exposure.sun_minutes,
             top_segment_ids=tuple(segment_id for leg in top.legs for segment_id in leg.segment_ids),
-            latency_ms=round((time.monotonic() - started) * 1000),
+            latency_ms=round((time.monotonic() - started) * MS_PER_SECOND),
         )
     )
 

@@ -303,7 +303,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **`heatAlert`** = feels-like ≥ 40 °C. `hourly` covers 24 h.
-- **More than 7 days ahead:** last year's weather for the same day, with `typical: true` and `naqi: null`.
+- **More than 7 days ahead:** the weather on the same weekday in the latest past year the archive has (usually last year), with `typical: true` and `naqi: null`.
 - **If the source is down:** serve cached data up to 24 h old with `stale: true`, then `502`.
 
 ### 5. `POST /routes/plan` (core)

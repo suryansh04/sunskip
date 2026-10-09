@@ -22,6 +22,7 @@ OVERPASS_TIMEOUT_S = 60  # Overpass is slow; the one call allowed past the usual
 OVERPASS_RETRY_WAIT_S = 30
 OVERPASS_TRIES = 3
 RETRY_STATUSES = {406, 429, 504}
+RUNTIME_ERROR = "runtime error"  # a busy server can answer 200 with partial data and this remark
 SPLIT_ID_BYTES = 7
 
 QUERY = """
@@ -129,6 +130,10 @@ def poi_row(element: dict) -> tuple:
     return osm_id, kind, element["tags"].get("name"), point["lon"], point["lat"], POI_WEIGHTS[kind]
 
 
+class OverpassBusyError(Exception):
+    pass
+
+
 def is_busy(error: httpx.HTTPError) -> bool:
     if isinstance(error, httpx.HTTPStatusError):
         return error.response.status_code in RETRY_STATUSES
@@ -144,7 +149,12 @@ async def run_overpass_query(query: str) -> list[dict]:
                 async with track_service("overpass"):
                     response = await http_client.post(url, data={"data": query}, timeout=OVERPASS_TIMEOUT_S)
                     response.raise_for_status()
-                return response.json()["elements"]
+                    answer = response.json()
+                    if RUNTIME_ERROR in answer.get("remark", ""):
+                        raise OverpassBusyError(answer["remark"])
+                return answer["elements"]
+            except OverpassBusyError as error:
+                last_error = error
             except httpx.HTTPError as error:
                 if not is_busy(error):
                     raise

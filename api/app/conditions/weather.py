@@ -71,14 +71,23 @@ async def _archive_day(lat: float, lng: float, day: date, shift: timedelta) -> t
     return _to_hour_map(hourly, shift), stale
 
 
+def years_back_to_archive(day: date, today: date) -> timedelta:
+    """Steps back whole years (same weekday) until the day is old enough for the archive to have it."""
+    shift = ONE_YEAR_SAME_WEEKDAY
+    while day - shift >= today - timedelta(days=FORECAST_PAST_DAYS):
+        shift += ONE_YEAR_SAME_WEEKDAY
+    return shift
+
+
 async def get_hourly_weather(lat: float, lng: float, at: datetime) -> tuple[HourlyWeather, bool, bool]:
     """Returns (hour -> (temp, feels-like), typical, stale) around `at`."""
     day, today = at.astimezone(IST).date(), datetime.now(IST).date()
     if day < ARCHIVE_START:
         raise ApiError(400, "INVALID_REQUEST", f"No weather data before {ARCHIVE_START.year}")
     if day > today + timedelta(days=FORECAST_AHEAD_DAYS):
-        # Too far ahead to forecast: use the same weekday one year earlier, marked typical
-        weather, stale = await _archive_day(lat, lng, day - ONE_YEAR_SAME_WEEKDAY, ONE_YEAR_SAME_WEEKDAY)
+        # Too far ahead to forecast: use the same weekday in an earlier year, marked typical
+        shift = years_back_to_archive(day, today)
+        weather, stale = await _archive_day(lat, lng, day - shift, shift)
         return weather, True, stale
     if day < today - timedelta(days=FORECAST_PAST_DAYS):
         weather, stale = await _archive_day(lat, lng, day, timedelta(0))

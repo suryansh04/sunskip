@@ -1,8 +1,7 @@
 from app.core.errors import ApiError
-from app.core.geo import haversine_m
+from app.core.geo import MAX_LAT, MAX_LNG, haversine_m
 
 SQUARE_METERS_PER_KM2 = 1_000_000
-MAX_LNG, MAX_LAT = 180, 90
 
 BBox = tuple[float, float, float, float]  # west, south, east, north
 

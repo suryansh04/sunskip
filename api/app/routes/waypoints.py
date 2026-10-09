@@ -7,14 +7,14 @@ from app.conditions.report import start_of_hour
 from app.config import IST, settings
 from app.contracts.models import LatLng, Leg, RouteOption, Waypoint, WaypointsResponse
 from app.core.errors import ApiError
-from app.core.geo import bearing_deg, sample_line
+from app.core.geo import FULL_TURN_DEG, bearing_deg, sample_line
 from app.db.trip_queries import load_trip
 from app.db.walk_queries import load_segments
 from app.shade.tiles import NO_DATA, SUN, sun_bits
 
 COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
 TURN_DEG = 30
-FULL_TURN_DEG = 360
+COMPASS_STEP_DEG = FULL_TURN_DEG / len(COMPASS)
 
 
 async def load_option(trip_id: UUID, option_id: str) -> RouteOption:
@@ -28,7 +28,7 @@ async def load_option(trip_id: UUID, option_id: str) -> RouteOption:
 
 
 def compass(bearing: float) -> str:
-    return COMPASS[round(bearing / 45) % len(COMPASS)]
+    return COMPASS[round(bearing / COMPASS_STEP_DEG) % len(COMPASS)]
 
 
 def in_sun_at(bits: np.ndarray, index: int, start_at: datetime) -> bool | None:

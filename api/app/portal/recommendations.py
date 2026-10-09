@@ -16,7 +16,6 @@ from app.portal.simulate import SegmentResult, minutes_saved_per_day, simulate
 from app.shade.bbox import BBox
 
 TOP_STRETCHES = 20
-STOP_NEAR_M = 30
 
 
 def spread_out(points: list[Point], spacing_m: float) -> list[Point]:
@@ -133,7 +132,7 @@ async def recommend(box: BBox, kind: str, budget_inr: int | None, month: int, ho
     if kind == "SHELTER":
         stops = {
             row["stretch_id"]: (row["lng"], row["lat"])
-            for row in await load_stops_near_stretches(stretch_ids, STOP_NEAR_M)
+            for row in await load_stops_near_stretches(stretch_ids, settings.stop_match_m)
         }
 
     async def score(row: asyncpg.Record) -> dict | None:

@@ -13,10 +13,11 @@ from app.db.demand_queries import APP_TRIPS_DAYS
 from app.db.portal_queries import load_heat_pain, load_stats, load_stretch, load_stretch_sun, load_top_origins
 from app.shade.bbox import BBox, bbox_polygon
 from app.shade.queue import ensure_shade
+from app.shade.tiles import HOURS
 
 DEFAULT_STATS_DAYS = 30
 ESTIMATED_BELOW_SHARE = 0.5  # walkers are "estimated" while app trips are under half of the estimate
-MONTHS, HOURS = 12, 24
+MONTHS = 12
 COORD_DECIMALS = 6
 
 
@@ -88,7 +89,7 @@ async def stretch_evidence(code: str) -> dict:
     stretch = await load_stretch(stretch_number(code))
     if stretch is None:
         raise ApiError(404, "NOT_FOUND", "Unknown stretch")
-    grid = [[None] * HOURS for _ in range(MONTHS)]  # None = sun below 5°
+    grid = [[None] * HOURS for _ in range(MONTHS)]  # None = sun below 5°, or no shade data
     for row in await load_stretch_sun(stretch["id"]):
         grid[row["month"] - 1][row["hour"]] = round_half_up(row["sun"], 2)
     return {
