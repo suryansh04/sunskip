@@ -27,6 +27,8 @@ def origin_entry(row: asyncpg.Record) -> dict:
 
 
 async def usage_stats(start_day: date | None, end_day: date | None) -> dict:
+    if start_day and end_day and start_day > end_day:
+        raise ApiError(400, "INVALID_REQUEST", "from must be on or before to")
     end = datetime.combine(end_day + timedelta(days=1), datetime.min.time(), IST) if end_day else datetime.now(IST)
     start = (
         datetime.combine(start_day, datetime.min.time(), IST) if start_day else end - timedelta(days=DEFAULT_STATS_DAYS)

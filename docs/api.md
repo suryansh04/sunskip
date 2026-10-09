@@ -586,6 +586,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 }
 ```
 
+- Defaults to the last 30 days. `from` later than `to` is `400 INVALID_REQUEST`.
+
 ### 14. `GET /portal/heat-pain?bbox=&month=&hours=&limit=50`
 
 **Does:** ranks stretches by pain score: how many people walk them in full sun.

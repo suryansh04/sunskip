@@ -32,11 +32,12 @@ async def get_area_statuses(areas: list[str]) -> dict[str, str]:
     return {row["geohash"]: row["status"] for row in rows}
 
 
-async def find_active_job(cells: list[str]) -> asyncpg.Record | None:
+async def find_active_job(cells: list[str], areas: list[str]) -> asyncpg.Record | None:
     return await get_pool().fetchrow(
         "SELECT id, cells, cells_done FROM shade_jobs WHERE status IN ('QUEUED', 'RUNNING') "
-        "AND cells && $1 ORDER BY created_at DESC LIMIT 1",
+        "AND (cells && $1 OR osm_areas && $2) ORDER BY created_at DESC LIMIT 1",
         cells,
+        areas,
     )
 
 
@@ -98,6 +99,13 @@ async def requeue_interrupted_work() -> None:
     )
     await get_pool().execute("UPDATE shade_cells SET status = 'PENDING' WHERE status = 'FETCHING'")
     await get_pool().execute("UPDATE osm_areas SET status = 'PENDING' WHERE status = 'FETCHING'")
+
+
+async def release_unfinished_cells(cells: list[str]) -> None:
+    """After a failed job: cells it left half-fetched go back to PENDING, so the next request queues them again."""
+    await get_pool().execute(
+        "UPDATE shade_cells SET status = 'PENDING' WHERE geohash = ANY($1) AND status = 'FETCHING'", cells
+    )
 
 
 async def finish_job(job_id: UUID, status: str, error: str | None) -> None:

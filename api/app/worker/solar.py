@@ -1,6 +1,7 @@
 import asyncio
 import logging
 import time
+from collections.abc import Awaitable
 from datetime import date
 from uuid import UUID
 
@@ -67,6 +68,16 @@ class DownloadPacer:
 pacer = DownloadPacer(settings.solar_geotiffs_per_minute)
 
 
+async def gather_all(*awaitables: Awaitable) -> list:
+    """Like asyncio.gather, but lets every task finish before raising the first error,
+    so nothing keeps downloading (and using quota) in the background after a failure."""
+    results = await asyncio.gather(*awaitables, return_exceptions=True)
+    errors = [result for result in results if isinstance(result, BaseException)]
+    if errors:
+        raise errors[0]
+    return results
+
+
 async def download_layer(url: str) -> bytes:
     # The download links need our key added and expire in about an hour
     tries_left = DOWNLOAD_TRIES
@@ -82,7 +93,7 @@ async def download_layer(url: str) -> bytes:
 
 async def save_cell_files(geohash: str, layers: dict) -> None:
     urls = {f"month_{month:02d}.tif": url for month, url in enumerate(layers["hourlyShadeUrls"], start=1)}
-    contents = await asyncio.gather(*(download_layer(url) for url in urls.values()))
+    contents = await gather_all(*(download_layer(url) for url in urls.values()))
     for name, content in zip(urls, contents, strict=True):
         await asyncio.to_thread(save_file, f"shade/{geohash}/{name}", content)
 
@@ -126,4 +137,4 @@ async def fetch_cells(job_id: UUID, cells: list[str]) -> None:
             no_data = await fetch_cell(geohash)
         await count_cell_done(job_id, no_data)
 
-    await asyncio.gather(*(fetch_and_count(geohash) for geohash in cells))
+    await gather_all(*(fetch_and_count(geohash) for geohash in cells))
