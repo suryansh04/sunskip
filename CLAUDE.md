@@ -131,7 +131,7 @@ The file names inside the feature folders are a starting point. Create a file on
 
 ```bash
 # database
-cd api && docker compose -f docker-compose.dev.yml up -d && python -m scripts.migrate
+cd api && docker compose -f docker-compose.dev.yml up -d --wait && python -m scripts.migrate
 # api (USE_FAKES=true returns the real Bus 26 numbers: 810 m, 11.3 / 7.4 min)
 uvicorn app.main:app --reload
 # worker
