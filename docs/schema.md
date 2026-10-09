@@ -84,9 +84,10 @@ Audio isn't stored in the database. It lives in S3 at `audio/{sha256(text|langua
 
 - **Cost:**
   - max 120 cells per job;
-  - max 60 new cells per client per day;
+  - max 60 new cells per client per day (a request queues what's left of that, the rest waits for the next day);
   - stop at 6,500 Solar calls a month (Google's free tier for India is 7,000).
 - **Crash recovery:** only one worker runs, so when it starts, any job left `RUNNING` goes back to `QUEUED` and any cell or OSM area left `FETCHING` goes back to `PENDING`. (A time limit would wrongly requeue a big preload job that's still running.)
+- **Failed jobs:** cells a failed job left `FETCHING` go back to `PENDING`. Any cell or OSM area that's not done and has no live job is queued again by the next request that needs it.
 - **No duplicates:** every write is an upsert on a unique key, so retries are safe.
 
 ---

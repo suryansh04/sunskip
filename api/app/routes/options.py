@@ -47,6 +47,8 @@ async def score_walk_leg(leg: Leg, feels_like: dict, shade_ready: bool, prefer_c
     month = leg.start_at.astimezone(IST).month
     line = await load_line_shade(coords, month, settings.shade_sample_spacing_m)
     path = await find_shadiest_path(coords, leg.start_at, feels_like)
+    if path and path.nodata_m >= path.length_m:
+        path = None  # our path has no shade data at all, so it can't tell us anything
     line_walk = line_sun(line, leg.start_at, feels_like) if line else None
     path_walk = walk_sun(path, leg.start_at, feels_like) if path else None
     leg.segment_ids = path.segment_ids if path else []

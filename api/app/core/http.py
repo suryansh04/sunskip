@@ -8,7 +8,9 @@ from app.config import settings
 from app.db.status_queries import record_service_result
 
 # httpx logs every URL at INFO, and Google URLs carry our key, so keep it quiet
-logging.getLogger("httpx").setLevel(logging.WARNING)
+# (httpx2 is the copy the Anthropic SDK brings along)
+for http_logger in ("httpx", "httpx2"):
+    logging.getLogger(http_logger).setLevel(logging.WARNING)
 
 # Public services like Overpass refuse requests that don't name the app
 USER_AGENT = "SunSkip/1.0 (shade-aware walking routes, India)"

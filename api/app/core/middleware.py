@@ -17,6 +17,8 @@ def hash_client_id(client_id: str) -> str:
 
 
 def _has_origin_secret(request: Request) -> bool:
+    if not settings.origin_secret:
+        return False  # check on but no secret set: refuse everything rather than let everyone in
     sent_secret = request.headers.get("X-Origin-Secret", "")
     return hmac.compare_digest(sent_secret, settings.origin_secret)
 

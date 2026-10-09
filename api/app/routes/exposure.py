@@ -10,7 +10,7 @@ from app.config import settings
 from app.contracts.models import Exposure
 from app.core.formulas import dose_weight, round_half_up, round_whole
 from app.core.geo import Point, line_length_m, sample_line
-from app.routes.walk import NO_SHADE_ROW, WalkPath
+from app.routes.walk import NO_SHADE_ROW, WalkPath, counted_sun
 from app.shade.tiles import NO_DATA, SHADE, sun_bits
 
 SECONDS_PER_MINUTE = 60
@@ -74,8 +74,7 @@ def sum_sun(
 
 def walk_sun(path: WalkPath, start_at: datetime, feels_like: dict) -> WalkSun:
     def sun_share(index: int, hour: int) -> float:
-        sun_fraction, nodata_fraction = path.sun.get((path.pieces[index][0], hour), NO_SHADE_ROW)
-        return 1.0 if nodata_fraction >= 1 else sun_fraction  # no data counts as sun
+        return counted_sun(path.sun.get((path.pieces[index][0], hour), NO_SHADE_ROW))
 
     return sum_sun([length for _, length in path.pieces], sun_share, start_at, feels_like)
 

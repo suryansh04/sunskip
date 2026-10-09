@@ -1,3 +1,5 @@
+from asyncpg import Record
+
 from app.config import settings
 from app.contracts.models import Shade
 from app.db.shade_queries import (
@@ -25,13 +27,15 @@ def preparing(job_id: str, cells_total: int, cells_done: int) -> Shade:
     )
 
 
-async def can_queue(client_hash: str | None, new_cells: int) -> bool:
+async def cells_allowed(client_hash: str | None) -> int:
+    """How many new cells this request may queue: none once the month's Solar budget is used,
+    and a device only gets what's left of its daily allowance."""
     if await get_solar_calls_this_month() >= settings.solar_monthly_call_budget:
-        return False
+        return 0
     if client_hash is None:
-        return True
-    already_today = await count_client_cells_today(client_hash)
-    return already_today + new_cells <= settings.max_new_cells_per_client_per_day
+        return settings.max_cells_per_job
+    left_today = settings.max_new_cells_per_client_per_day - await count_client_cells_today(client_hash)
+    return max(0, min(settings.max_cells_per_job, left_today))
 
 
 def points_of(coordinates: list) -> list[list[float]]:
@@ -46,30 +50,40 @@ def inside_india(area: dict) -> bool:
     return all(west <= lng <= east and south <= lat <= north for lng, lat in points_of(area["coordinates"]))
 
 
+async def find_missing_work(cells: list[str], areas: list[str]) -> tuple[list[str], list[str], dict, Record | None]:
+    """(missing cells, missing OSM areas, cell statuses, active job). Work left in progress without a live job
+    (its job failed or was cut off) counts as missing, so it gets queued again."""
+    cell_statuses = await get_cell_statuses(cells)
+    area_statuses = await get_area_statuses(areas)
+    busy_cells = [cell for cell in cells if cell_statuses.get(cell) in IN_PROGRESS]
+    busy_areas = [area_hash for area_hash in areas if area_statuses.get(area_hash) in IN_PROGRESS]
+    active_job = await find_active_job(busy_cells, busy_areas) if busy_cells or busy_areas else None
+    missing_cells = [
+        cell for cell in cells if cell_statuses.get(cell) not in DONE and (cell not in busy_cells or not active_job)
+    ]
+    missing_areas = [
+        area_hash
+        for area_hash in areas
+        if area_statuses.get(area_hash) != "READY" and (area_hash not in busy_areas or not active_job)
+    ]
+    return missing_cells, missing_areas, cell_statuses, active_job
+
+
 async def ensure_shade(area: dict, buffer_m: float, reason: str, client_hash: str | None) -> Shade:
     """Checks shade data around `area` (GeoJSON). Queues a job for what's missing; never waits."""
     if not inside_india(area):
         return Shade(status="UNAVAILABLE")  # v1 is India only: never spend Solar calls elsewhere
     cells, areas = await find_cells_and_areas(area, buffer_m)
-    cell_statuses = await get_cell_statuses(cells)
-    in_progress = [cell for cell in cells if cell_statuses.get(cell) in IN_PROGRESS]
-    active_job = await find_active_job(in_progress) if in_progress else None
-    # Cells stuck in progress without a live job (its job failed) get queued again
-    missing = [
-        cell for cell in cells if cell_statuses.get(cell) not in DONE and (cell not in in_progress or not active_job)
-    ]
-    area_statuses = await get_area_statuses(areas)
-    missing_areas = [area_hash for area_hash in areas if area_statuses.get(area_hash, "ERROR") == "ERROR"]
-
-    if not missing and not missing_areas:
+    missing_cells, missing_areas, cell_statuses, active_job = await find_missing_work(cells, areas)
+    if not missing_cells and not missing_areas:
         if active_job:
             return preparing(str(active_job["id"]), len(active_job["cells"]), active_job["cells_done"])
         if cells and all(cell_statuses[cell] == "NO_DATA" for cell in cells):
             return Shade(status="UNAVAILABLE")
         return Shade(status="READY")
-
-    new_cells = missing[: settings.max_cells_per_job]
-    if not await can_queue(client_hash, len(new_cells)):
+    allowed = await cells_allowed(client_hash)
+    if missing_cells and not allowed:
         return Shade(status="UNAVAILABLE")
+    new_cells = missing_cells[:allowed]
     job_id = await queue_job(reason, client_hash, new_cells, missing_areas)
     return preparing(job_id, len(new_cells), 0)

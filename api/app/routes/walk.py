@@ -44,6 +44,12 @@ async def load_corridor(line: dict, month: int) -> Corridor:
     return corridor
 
 
+def counted_sun(sun_row: tuple[float, float]) -> float:
+    """The sun share we count for one segment-hour. No data counts as sun: we never claim shade we can't see."""
+    sun_fraction, nodata_fraction = sun_row
+    return 1.0 if nodata_fraction >= 1 else sun_fraction
+
+
 def edge_cost(length_m: float, sun_fraction: float, weight: float) -> float:
     return length_m * (1 + settings.shade_alpha * sun_fraction * weight)
 
@@ -54,7 +60,7 @@ def build_graph(corridor: Corridor, hour: int, weight: float) -> nx.Graph:
         length = corridor.lengths[segment_id]
         if graph.has_edge(node_a, node_b) and graph[node_a][node_b]["length"] <= length:
             continue
-        sun_fraction = corridor.sun.get((segment_id, hour), NO_SHADE_ROW)[0]
+        sun_fraction = counted_sun(corridor.sun.get((segment_id, hour), NO_SHADE_ROW))
         graph.add_edge(
             node_a, node_b, segment_id=segment_id, length=length, cost=edge_cost(length, sun_fraction, weight)
         )

@@ -25,6 +25,7 @@ FIELD_MASK = ",".join(
 CACHE_BUCKET_MINUTES = 15
 POINT_DECIMALS = 5
 ONE_WEEK = timedelta(weeks=1)
+BAD_KEY_REASON = "API_KEY_INVALID"  # Google answers a bad key with a 400 too
 
 
 def google_departure_time(depart_at: datetime) -> datetime:
@@ -64,7 +65,7 @@ async def _request_routes(body: dict) -> list[dict]:
     headers = {"X-Goog-Api-Key": settings.google_api_key, "X-Goog-FieldMask": FIELD_MASK}
     async with track_service("google_routes"):
         response = await http_client.post(ROUTES_URL, json=body, headers=headers)
-        if response.status_code == 400:
+        if response.status_code == 400 and BAD_KEY_REASON not in response.text:
             return []  # place not found or no route: not a Google outage
         response.raise_for_status()
     return response.json().get("routes", [])
@@ -89,5 +90,6 @@ async def compute_routes(
         body["computeAlternativeRoutes"] = True
         body["departureTime"] = depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
     routes = await _request_routes(body)
-    await write_routes_cache(cache_key, {"routes": routes})
+    if routes:  # "no route" isn't cached, so a fixed typo or a new bus line shows up straight away
+        await write_routes_cache(cache_key, {"routes": routes})
     return routes
