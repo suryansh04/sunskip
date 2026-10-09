@@ -72,6 +72,7 @@ Every error looks like `{ "error": { "code", "message", "requestId" } }`.
 | 429     | `RATE_LIMITED`    | Not used in v1 (reserved). Too many calls (`Retry-After` set)                                                           | Wait                       |
 | 502/504 | `UPSTREAM_ERROR`  | Google, Sarvam, Claude or Open-Meteo failed                                                                             | Use a fallback             |
 | 500/503 | `INTERNAL_ERROR`  | Our bug or DB down                                                                                                      | Retry once, then a banner  |
+| 501     | `NOT_IMPLEMENTED` | Agent and voice endpoints until P2's code is in                                                                         | Hide the feature           |
 
 **Student-app endpoints never fail because shade is missing.** They return results with a `shade` block and `null` sun fields instead.
 
@@ -336,7 +337,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
    - Also add a walk-only route if the trip is 3 km or less.
 2. **Shade check per walk leg:**
    - Buffer the walk by 100 m and list its map cells.
-   - If any cells are missing, queue **one** `PLAN` job for the trip (max 120 cells; max 60 new cells per client per day) and mark those legs `shadeKnown: false`.
+   - If any cells are missing, queue **one** `PLAN` job for the trip (max 120 cells; max 60 new cells per client per day) and mark the walk legs that pass through them `shadeKnown: false`. Walk legs whose own cells are all fetched are scored straight away, even while the rest of the trip is being prepared.
    - **Don't wait.**
 3. **Walk legs with shade:**
    - Score Google's walking line directly: sample it every 5 m and read each point's sun bit from the Solar files, with the hour moving forward at 1.2 m/s. This is exactly how the pilot walk was measured.

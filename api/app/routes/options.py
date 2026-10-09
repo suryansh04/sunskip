@@ -4,6 +4,8 @@ from app.conditions.report import start_of_hour
 from app.config import IST, settings
 from app.contracts.models import Leg, RouteOption, Shade
 from app.core.formulas import round_whole
+from app.core.geo import sample_line
+from app.db.shade_queries import get_cell_statuses
 from app.db.walk_queries import find_stop_shade
 from app.routes.exposure import (
     WalkSun,
@@ -17,6 +19,8 @@ from app.routes.exposure import (
     walk_sun,
 )
 from app.routes.walk import WalkPath, find_shadiest_path
+from app.shade.queue import DONE
+from app.shade.tiles import cell_of
 
 TRANSIT_MODES = {"BUS", "METRO", "RAIL"}
 
@@ -33,15 +37,23 @@ def follow_path(leg: Leg, path: WalkPath) -> None:
     leg.end_at = leg.start_at + timedelta(seconds=leg.duration_seconds)
 
 
+async def shade_fetched_along(coords: list[tuple[float, float]]) -> bool:
+    """True when every shade cell this line passes through has been fetched, so a walk can be scored even while
+    other parts of the trip are still being prepared."""
+    cells = {cell_of(point) for point in sample_line(coords, settings.shade_sample_spacing_m)}
+    statuses = await get_cell_statuses(list(cells))
+    return all(statuses.get(cell) in DONE for cell in cells)
+
+
 def set_coverage(leg: Leg, nodata_m: float) -> None:
     leg.shade_known, leg.coverage = True, "PARTIAL" if nodata_m > 0 else "FULL"
 
 
-async def score_walk_leg(leg: Leg, feels_like: dict, shade_ready: bool, prefer_cooler: bool) -> tuple[WalkSun, bool]:
+async def score_walk_leg(leg: Leg, feels_like: dict, prefer_cooler: bool) -> tuple[WalkSun, bool]:
     """Scores Google's walking line straight from the shade files (like the pilot walk). Returns the walk's sun,
     and whether our own OSM path is shady enough to be worth offering as a cooler option."""
     coords = [tuple(point) for point in leg.polyline["coordinates"]]
-    if not shade_ready or len(coords) < 2:
+    if len(coords) < 2 or not await shade_fetched_along(coords):
         leg.shade_known, leg.coverage = False, "NONE"
         return unknown_walk_sun(leg.distance_meters, peak_feels_like(feels_like, leg.start_at, leg.end_at)), False
     month = leg.start_at.astimezone(IST).month
@@ -107,7 +119,7 @@ async def build_option(
     walks, waits, has_cooler = [], [], False
     for leg in legs:
         if leg.mode == "WALK":
-            walk, cooler = await score_walk_leg(leg, feels_like, shade.status == "READY", prefer_cooler)
+            walk, cooler = await score_walk_leg(leg, feels_like, prefer_cooler)
             walks.append(walk)
             has_cooler = has_cooler or cooler
         elif leg.mode in TRANSIT_MODES:
