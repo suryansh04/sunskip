@@ -31,7 +31,7 @@ worker → Google Solar (shade), OpenStreetMap Overpass (walkways, stops)
 both   → RDS PostgreSQL + PostGIS (data + job queue), S3 (shade files, audio), Secrets Manager
 ```
 
-- **Base URL:** `https://{api-id}.execute-api.ap-south-1.amazonaws.com/v1`
+- **Base URL:** `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1`
 - **Local:** the api runs at `http://localhost:8000/v1` with `ORIGIN_SECRET_CHECK=false`. Front ends use `VITE_API_BASE_URL=/v1`; the Vite dev server forwards it (TRD §2).
 
 ---
