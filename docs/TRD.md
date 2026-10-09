@@ -638,18 +638,77 @@ services:
    - CORS is set on the API, so the gateway answers browser `OPTIONS` pre-checks itself, before the authorizer.
    - The public URL is then `https://<api-id>.execute-api.ap-southeast-2.amazonaws.com/v1/...`, matching `api.md`.
 
-**Updating** (after each merge to `main`, before demos)
+### 8.2 Running production (tested 9 Oct)
+
+All commands are for Git Bash with the AWS CLI configured for the account above (`aws sts get-caller-identity` shows `056362973989`).
 
 ```bash
-cd sunskip/api && git pull && docker compose up -d --build
+export AWS_DEFAULT_REGION=ap-southeast-2 MSYS_NO_PATHCONV=1
+BUCKET=sunskip-shade-056362973989
+INSTANCE=i-0384760bd67270bbf
 ```
 
-**Watching**
+#### Update the live code (about 3 minutes)
 
-- `docker compose ps` shows both containers.
-- `docker compose logs -f worker` shows the shade jobs.
-- `/health` shows the worker heartbeat and the job queue.
-- `restart: unless-stopped` brings both back after a crash or reboot.
+From the repo root, on an up-to-date `main`:
+
+```bash
+git archive --format=tar.gz -o api.tar.gz main api
+aws s3 cp api.tar.gz s3://$BUCKET/deploy/api.tar.gz && rm api.tar.gz
+aws ssm send-command --instance-ids $INSTANCE --document-name AWS-RunShellScript \
+  --query Command.CommandId --output text --parameters '{"commands":[
+    "export PATH=$PATH:/snap/bin", "cd /srv/sunskip",
+    "aws s3 cp s3://sunskip-shade-056362973989/deploy/api.tar.gz . --only-show-errors",
+    "tar -xzf api.tar.gz", "cd api", "docker compose build -q",
+    "docker compose run --rm -T api python -m scripts.migrate",
+    "docker compose up -d", "sleep 15", "docker compose ps"],
+  "executionTimeout":["1800"]}'
+```
+
+Then read the result with the command id it printed, and check health:
+
+```bash
+aws ssm get-command-invocation --command-id <id> --instance-id $INSTANCE --query "[Status,StandardOutputContent]" --output text
+curl https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1/health
+```
+
+You want `Success`, both containers `Up`, and `"status":"ok"`. New migrations in `api/migrations/` run as part of the update.
+
+#### Watch it
+
+- `GET /v1/health`: database, S3, the worker's last heartbeat, the job queue and Solar calls used this month. `"status":"degraded"` means a service failed last time or the worker went quiet for 2 minutes.
+- Logs: send `cd /srv/sunskip/api && docker compose logs --tail 100 worker` (or `api`) the same way as "Update the live code".
+
+#### Rotate the Google key
+
+1. Make a new key in Google Cloud (Routes, Solar and Air Quality APIs) and delete the old one.
+2. Update only that field of the secret (Git Bash, Python available):
+   ```bash
+   aws secretsmanager get-secret-value --secret-id sunskip/prod --query SecretString --output text \
+     | NEW_KEY='<new key>' python -c "import json,os,sys; s=json.load(sys.stdin); s['GOOGLE_API_KEY']=os.environ['NEW_KEY']; print(json.dumps(s))" \
+     > secret.json && aws secretsmanager put-secret-value --secret-id sunskip/prod --secret-string file://secret.json && rm secret.json
+   ```
+3. Restart the containers so they read it: send `cd /srv/sunskip/api && docker compose restart` as in "Update the live code".
+
+#### Add a portal login
+
+```bash
+aws cognito-idp admin-create-user --user-pool-id ap-southeast-2_kb0XfRcnQ --username official@example.com \
+  --user-attributes Name=email,Value=official@example.com Name=email_verified,Value=true
+```
+
+Cognito emails a temporary password. The pool is `sunskip-portal` (`ap-southeast-2_kb0XfRcnQ`). The hosted login page only redirects to `http://localhost:5174/callback` until the portal is on Amplify; its real URL has to be added to the app client and to the API Gateway CORS list then.
+
+#### Stop paying when idle
+
+```bash
+aws ec2 stop-instances --instance-ids $INSTANCE
+aws rds stop-db-instance --db-instance-identifier sunskip-db
+```
+
+Start them again with `start-instances` and `start-db-instance`; the containers start by themselves (`restart: unless-stopped`). AWS restarts a stopped database by itself after 7 days. The Elastic IP costs a little while the server is stopped.
+
+- `restart: unless-stopped` brings both containers back after a crash or reboot.
 
 ---
 
