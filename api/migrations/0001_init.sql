@@ -19,7 +19,7 @@ CREATE TABLE shade_cells (
                      CHECK (status IN ('PENDING','FETCHING','READY','NO_DATA','ERROR','BUDGET_EXCEEDED')),
     imagery_date     date,
     imagery_quality  text        CHECK (imagery_quality IN ('HIGH','MEDIUM','BASE')),
-    s3_prefix        text        UNIQUE,     -- s3://bucket/shade/<geohash>/ holds month_01.tif .. month_12.tif + dsm.tif
+    s3_prefix        text        UNIQUE,     -- s3://bucket/shade/<geohash>/ holds month_01.tif .. month_12.tif
     attempts         smallint    NOT NULL DEFAULT 0,
     last_error       text,
     requested_at     timestamptz NOT NULL DEFAULT now(),

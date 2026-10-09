@@ -163,6 +163,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - Scale duration `d`, fare `c` and heat dose `h` to 0..1 across the options. An unknown value counts as 1.
 - `score = p × h + (1 − p) × (0.5 × d + 0.5 × c)`. **Lowest score = RECOMMENDED.**
+- Only the best 6 by score are returned (`MAX_OPTIONS`). The labels below are given after that cut, so each one points at an option the user can see.
 - **Other labels:**
   - `FASTEST` = shortest time;
   - `CHEAPEST` = lowest known fare;
@@ -350,8 +351,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 5. **E-rickshaw swap:**
    - A walk leg over 500 m, or with over 5 hot-sun minutes, whose two ends are both inside a drawn e-rickshaw zone (v1: MUJ area + Jaipur Pink Line station areas), gets an extra option.
    - Time = distance ÷ 4.2 m/s + 120 s wait. The fare comes from the zone, with the warning `FARE_ESTIMATED`.
-   - Max 6 options.
-6. **Rank and add warnings:**
+   - A walk and its shadier copy turn into the same ride, so each ride is added once.
+6. **Rank, keep the best 6 (`MAX_OPTIONS`), label them and add warnings:**
    - `HEAT_ALERT` (feels-like ≥ 40 °C)
    - `LONG_WAIT_IN_SUN` (≥ 5 min)
    - `SHADE_PREPARING`
@@ -430,7 +431,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
     },
     {
       "departAt": "2026-05-15T17:00:00+05:30",
-      "sunMinutes": 7.4,
+      "sunMinutes": 7.6,
       "heatDose": 14.9
     }
   ],
@@ -439,7 +440,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 }
 ```
 
-- **Real:** 11.3 min at 1 PM and 7.4 min at 5 PM in May. The doses assume an example 5 min wait and feels-like 44 °C / 41 °C.
+- **Real:** 11.3 min at 1 PM and 7.6 min at 5 PM in May, as the API measures it today (the pilot CSV gave 7.4; PRD §8 explains the gap). The doses are examples: they assume a 5 min wait and feels-like 44 °C / 41 °C.
 - **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Waiting minutes stay the same for every slot.
 - **No shade data:** `basis: "TEMPERATURE_ONLY"`, `sunMinutes: null`. Slots are ranked by `walkMinutes × max(heatWeight, 0.1)` while the sun is ≥ 5° up. This is labelled as an estimate.
 
@@ -500,7 +501,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
   "sessionId": "0c7e...",
   "reply": "(Hindi text)",
   "replyLanguage": "hi-IN",
-  "englishReply": "Yes. Leaving at 5 PM in May means 7.4 sun minutes, versus 11.3 at 1 PM.",
+  "englishReply": "Yes. Leaving at 5 PM in May means 7.6 sun minutes, versus 11.3 at 1 PM.",
   "toolsUsed": ["find_best_time"],
   "audioUrl": "https://...",
   "fallback": false
@@ -809,11 +810,14 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 | Name                                                                                                 | Default                                   |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | set at deploy                             |
+| `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | set at deploy (P2 adds them to `config.py` with the agent and voice code) |
+| `USE_FAKES`                                                                                          | false (true returns the pilot numbers)    |
+| `OUTSIDE_CALL_TIMEOUT_S`                                                                             | 10                                        |
 | `WALK_SPEED_MPS`                                                                                     | 1.2                                       |
 | `HEAT_ALERT_FEELS_LIKE_C`                                                                            | 40                                        |
 | `SHADE_ALPHA`, `MAX_DETOUR_RATIO`                                                                    | 3.0, 1.3                                  |
-| `DEFAULT_WAIT_SECONDS`                                                                               | 300                                       |
+| `DEFAULT_WAIT_SECONDS`, `LONG_WAIT_IN_SUN_MIN`                                                       | 300, 5                                    |
+| `WALK_ONLY_MAX_M`, `MAX_OPTIONS`                                                                     | 3000, 6                                   |
 | `SWAP_MIN_WALK_M`, `SWAP_MIN_HOT_SUN_MIN`                                                            | 500, 5                                    |
 | `ERICKSHAW_SPEED_MPS`, `ERICKSHAW_WAIT_SECONDS`                                                      | 4.2, 120                                  |
 | `WAYPOINT_SPACING_M`                                                                                 | 25                                        |
@@ -822,7 +826,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`                                              | 6500, 4                                   |
 | `OVERPASS_URLS` (tried in order; the main server is often busy)                                      | overpass-api.de, then maps.mail.ru        |
 | `COOLER_PATH_MIN_SAVING_MIN`, `SOLAR_GEOTIFFS_PER_MINUTE`                                            | 1.0, 150                                  |
-| `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600                       |
+| `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600 (P2)                  |
+| `MAX_SHADE_MAP_KM2`, `POLL_AFTER_SECONDS`                                                            | 1, 3                                      |
 | `ORIGIN_SECRET_CHECK`                                                                                | true (false only locally)                 |
 | `MAX_PORTAL_BBOX_KM2`, `SIMULATION_REACH_M`                                                          | 25, 60                                    |
 | `TREE_HEIGHT_M`, `TREE_CROWN_RADIUS_M`, `SHELTER_WIDTH_M`, `SHELTER_LENGTH_M`, `SHELTER_HEIGHT_M`    | 6, 3, 3, 6, 3                             |

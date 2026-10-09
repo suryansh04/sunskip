@@ -5,9 +5,9 @@ SunSkip finds walking, bus and metro routes with the least direct sun, anywhere 
 - **Students** enter where they are going. SunSkip shows each route with the minutes they will spend in the sun, and the best time to leave.
 - **City officials** see which footpaths are the hottest for the most people, and where trees or shelters would help most.
 
-For example, the 810 m walk from Manipal University Jaipur to the Bus 26 stop is in direct sun for 11.3 minutes at 1 PM and 7.4 minutes at 5 PM in May.
+For example, the 810 m walk from Manipal University Jaipur to the Bus 26 stop is in direct sun for 11.3 minutes at 1 PM but 7.6 minutes at 5 PM in May.
 
-The backend is live on AWS. The student app and the portal are being built.
+The backend is live on AWS. The student app and the portal are being built; a clickable design of the app is at https://sunskip-ui.vercel.app.
 
 ## How it works
 
@@ -31,7 +31,7 @@ flowchart LR
 3. If an area has no shade data yet, the API answers straight away and adds a **shade job** to the database. The **worker** downloads the shade maps and the footpaths for that area, and the next request gets full results.
 4. The portal uses the same data to rank footpaths by how much sun people walk through, and to test where new trees or shelters would help.
 
-Built with Python 3.12, FastAPI, PostgreSQL 16 with PostGIS, and Docker, running on AWS. More detail: [product](docs/PRD.md), [tech](docs/TRD.md), [API](docs/api.md), [database](docs/schema.md), [team rules](CLAUDE.md).
+Built with Python 3.12, FastAPI, PostgreSQL 16 with PostGIS, and Docker, running on AWS. More detail: [product](docs/PRD.md), [tech](docs/TRD.md), [API](docs/api.md), [database](docs/schema.md), [design](docs/design.md), [team rules](CLAUDE.md).
 
 ## Set it up on your laptop
 
