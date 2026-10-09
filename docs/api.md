@@ -259,6 +259,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **bbox:** max 1 km².
 - **Missing cells** are queued as a `MAP` job; segments that are ready return now.
 - **`sunFraction` is 0** when the sun is below 5°.
+- **`sunFraction` is `null`** when Google has no shade data for that segment at that hour (unknown, not shade); the app draws it grey.
 
 ### 3. `GET /shade/jobs/{jobId}`
 
