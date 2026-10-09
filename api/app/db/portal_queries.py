@@ -101,11 +101,14 @@ async def load_stretch_sun(stretch_id: int) -> list[asyncpg.Record]:
 
 async def load_segments_near(points: list[tuple[float, float]], reach_m: float) -> list[asyncpg.Record]:
     """Shade-ready segments within reach of any of these points, with their walkers per day."""
+    # The && box check lets the geometry index skip far-away segments before the exact distance check
     return await get_pool().fetch(
         """
+        WITH area AS (SELECT ST_Envelope(ST_Buffer(ST_GeomFromGeoJSON($1)::geography, $2)::geometry) AS box)
         SELECT s.id, s.length_m, ST_AsGeoJSON(s.geom)::json AS geometry, COALESCE(d.walkers_per_day, 0) AS walkers
         FROM segments s LEFT JOIN demand_estimates d ON d.segment_id = s.id
-        WHERE s.shade_ready AND ST_DWithin(s.geom::geography, ST_GeomFromGeoJSON($1)::geography, $2)
+        WHERE s.shade_ready AND s.geom && (SELECT box FROM area)
+          AND ST_DWithin(s.geom::geography, ST_GeomFromGeoJSON($1)::geography, $2)
         """,
         json.dumps({"type": "MultiPoint", "coordinates": points}),
         reach_m,
@@ -123,7 +126,9 @@ async def load_stops_near_stretches(stretch_ids: list[int], max_m: float) -> lis
     return await get_pool().fetch(
         """
         SELECT DISTINCT ON (st.id) st.id AS stretch_id, ST_X(stop.geom) AS lng, ST_Y(stop.geom) AS lat
-        FROM stretches st JOIN stops stop ON ST_DWithin(stop.geom::geography, st.geom::geography, $2)
+        FROM stretches st JOIN stops stop
+          ON stop.geom && ST_Envelope(ST_Buffer(st.geom::geography, $2)::geometry)
+         AND ST_DWithin(stop.geom::geography, st.geom::geography, $2)
         WHERE st.id = ANY($1)
         ORDER BY st.id, stop.geom <-> st.geom
         """,

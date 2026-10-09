@@ -32,7 +32,7 @@ async def find_stop_shade(
         SELECT st.id, CASE WHEN st.has_shelter THEN true ELSE ss.sun_fraction < $6 END AS shaded, ss.sun_fraction
         FROM stops st
         LEFT JOIN stop_shade ss ON ss.stop_id = st.id AND ss.month = $3 AND ss.hour = $4
-        WHERE ST_DWithin(st.geom::geography, ST_Point($1, $2, 4326)::geography, $5)
+        WHERE ST_Intersects(st.geom, ST_Buffer(ST_Point($1, $2, 4326)::geography, $5)::geometry)
         ORDER BY st.geom <-> ST_Point($1, $2, 4326)
         LIMIT 1
         """,
