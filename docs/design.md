@@ -109,7 +109,7 @@ Noto Sans Devanagari is there for Hindi text (agent replies, spoken-direction ca
 **[Phosphor Icons](https://phosphoricons.com)**, MIT licence. Use the **Bold** weight everywhere, and **Fill** only for the mic, the speaker, the start-walking arrow and the big arrow backup.
 
 ```bash
-npm install @phosphor-icons/react   # add to TRD §2.1 allowed packages first
+npm install @phosphor-icons/react   # listed in TRD §2.1
 ```
 
 ```tsx

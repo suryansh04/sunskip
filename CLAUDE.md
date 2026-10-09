@@ -45,8 +45,8 @@ If the code and the docs disagree, stop and ask. Don't guess. Keep the docs upda
 sunskip_app/
 ├── CLAUDE.md
 ├── README.md              what it is, architecture, local setup
-├── docs/                  PRD.md  TRD.md  api.md  schema.md
-├── .github/workflows/     ci.yml (ruff for api, build for app + portal)
+├── docs/                  PRD.md  TRD.md  api.md  schema.md  design.md  plans/
+├── .github/workflows/     ci.yml (ruff for api; add npm build jobs once app/ and portal/ exist)
 ├── .gitignore
 │
 ├── api/                   FastAPI + worker (Python 3.12)
@@ -57,14 +57,15 @@ sunskip_app/
 │   │   ├── contracts/         models.py (Pydantic shapes), ids.py (seg_/str_ ids), fakes.py
 │   │   ├── db/                pool.py, *_queries.py, cleanup.py
 │   │   ├── meta/              router.py
-│   │   ├── conditions/        router.py, weather.py, air.py
+│   │   ├── conditions/        router.py, report.py, weather.py, air.py
 │   │   ├── shade/             router.py, queue.py, segments.py, tiles.py, bbox.py
-│   │   ├── routes/            router.py, google.py, legs.py, walk.py, exposure.py, ranking.py, plan.py, ...
-│   │   ├── portal/            router.py, heat_pain.py, recommendations.py, simulate.py
+│   │   ├── routes/            router.py, plan.py, google.py, legs.py, options.py, walk.py, exposure.py, ranking.py,
+│   │   │                      erickshaw.py, best_time.py, waypoints.py
+│   │   ├── portal/            router.py, reports.py, recommendations.py, simulate.py
 │   │   ├── health/            router.py
 │   │   ├── agent/             router.py, ...           (P2)
 │   │   ├── voice/             router.py, sarvam.py     (P2)
-│   │   └── worker/            __main__.py, job.py, overpass.py, solar.py, scoring.py, demand.py
+│   │   └── worker/            __main__.py, job.py, overpass.py, solar.py, scoring.py, stretches.py, demand.py
 │   ├── migrations/            0001_init.sql, ...
 │   ├── scripts/               migrate.py, preload.py, seed_zones.py
 │   ├── requirements.txt  Dockerfile  docker-compose.yml  docker-compose.dev.yml
@@ -97,7 +98,7 @@ The file names inside the feature folders are a starting point. Create a file on
 - Logic functions don't know about HTTP, so the agent tools (P2) can call the same functions as the endpoints.
 - SQL lives in `db/*_queries.py` (plain SQL through the `asyncpg` pool, no ORM). Schema changes are new files in `api/migrations/`.
 
-**Ownership:** P1 (Suryansh) owns `api/`, `app/`, `portal/` and is the only one who writes migrations. P2 works in `api/app/agent`, `api/app/voice`, `app/src/features/agent`, `app/src/features/voice`. P3 works in `app/src/features/ar`. Ask before editing outside your area.
+**Ownership:** P1 (Suryansh) owns `api/` and `portal/` and is the only one who writes migrations. P3 builds the whole student app in `app/`, including `app/src/features/ar`, following `docs/design.md`. P2 works in `api/app/agent`, `api/app/voice`, `app/src/features/agent`, `app/src/features/voice`. Ask before editing outside your area.
 
 ## Front end (`app/`, `portal/`)
 
@@ -107,7 +108,7 @@ The file names inside the feature folders are a starting point. Create a file on
 - One component per file, default export, destructured props.
 - Data fetching uses the single pattern in TRD §2.3 (axios `api` client, `data`/`loading`/`error` state).
 - Every screen has loading, error and empty states.
-- Tailwind only for styling. Colours: shade `#2F80ED`, sun `#F2994A`, alert `#B91C1C`.
+- Tailwind only for styling. Colours, font, icons and the map style are in `docs/design.md` (core colours: shade `#2F80ED`, sun `#F2994A`, alert `#B91C1C`).
 - App is mobile-first (360 px, one column, `py-3` tap targets). Portal is desktop-first (1280 px+).
 
 ## Backend (`api/`)

@@ -142,7 +142,7 @@
 | Trip planner, anywhere in India      | P0     | Options with sun minutes per walk; under 3 s; never waits for shade                                                             |
 | "Preparing shade data" state         | P0     | Shows progress, polls every 3 s, swaps in the new routes automatically                                                          |
 | Fastest / cheapest / coolest card    | P0     | Time, ₹ (or "unknown"), minutes in sun (or "unknown")                                                                           |
-| Best time to leave                   | P0     | Pilot shows **11.3 min at 1 PM vs 7.4 at 5 PM**                                                                                 |
+| Best time to leave                   | P0     | Pilot shows **11.3 min at 1 PM vs 7.4 at 5 PM** (the API gives 7.6 at 5 PM, see §8)                                              |
 | Shade map                            | P0     | Paths coloured by sun for any hour                                                                                              |
 | Heat banner                          | P0     | Temp, feels-like, NAQI; alert at feels-like 40 °C                                                                               |
 | E-rickshaw swap                      | P1     | Only in drawn zones (MUJ + Jaipur metro station areas); fare from a formula, marked as estimate (no time to collect real fares) |
@@ -169,8 +169,8 @@
 
 **For the hackathon:**
 
-- **Pilot numbers match:** the deployed API shows 11.3 min at 1 PM and 7.4 at 5 PM for the May pilot walk.
-  - Measured locally (9 Oct): **11.3 at 1 PM** exactly; **7.6 at 5 PM**. Every hour is within ±0.2 of the table. The shade files agree with the pilot CSV on all 163 points every hour; the small gap is because the line Google returns today sits up to 1.4 m off the pilot's points.
+- **Pilot numbers match:** the deployed API shows 11.3 min at 1 PM for the May pilot walk, and every hour within ±0.2 of the pilot table (7.6 at 5 PM vs 7.4).
+  - Measured locally (9 Oct) and on the deployed API (10 Oct): **11.3 at 1 PM** exactly; **7.6 at 5 PM**. Every hour is within ±0.2 of the table. The shade files agree with the pilot CSV on all 163 points every hour; the small gap is because the line Google returns today sits up to 1.4 m off the pilot's points.
 - **"Anywhere" works live:** a trip in a city we never preloaded goes from "preparing" to the shadiest route within about a minute.
 - **AR works live:** arrows follow a real route on one Android and one iPhone.
 - **Fast:** plan under 3 s, agent under 15 s. Everything is under API Gateway's 29 s limit (verified).
@@ -224,7 +224,7 @@ All P0 and P1 features stay in. The full per-person schedule is in the team hand
 ## 12. Open questions
 
 - **Hackathon details:** name and judging criteria are unknown; add them here. Deadline: Sun 11 Oct, 23:59 IST.
-- **Teammate names:** unknown (Person 2 = AI, Person 3 = AR).
+- **Teammate names:** unknown (Person 2 = AI and voice, Person 3 = the student app and AR).
 
 ---
 
