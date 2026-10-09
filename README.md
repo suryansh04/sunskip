@@ -1,11 +1,13 @@
 # SunSkip
 
-SunSkip finds walking and bus routes with the least direct sun, anywhere in India.
+SunSkip finds walking, bus and metro routes with the least direct sun, anywhere in India that Google has shade data for.
 
 - **Students** enter where they are going. SunSkip shows each route with the minutes they will spend in the sun, and the best time to leave.
 - **City officials** see which footpaths are the hottest for the most people, and where trees or shelters would help most.
 
 For example, the 810 m walk from Manipal University Jaipur to the Bus 26 stop is in direct sun for 11.3 minutes at 1 PM and 7.4 minutes at 5 PM in May.
+
+The backend is live on AWS. The student app and the portal are being built.
 
 ## How it works
 
@@ -17,14 +19,15 @@ flowchart LR
     api <--> db[("PostgreSQL + PostGIS<br/>(RDS)")]
     api --> routes["Google Routes"]
     api --> weather["Open-Meteo weather<br/>Google Air Quality"]
+    api -->|"reads"| s3[("S3<br/>shade files")]
     db <-->|"shade jobs"| worker["Worker<br/>(same EC2 server)"]
     worker --> solar["Google Solar<br/>hourly shade maps"]
     worker --> osm["OpenStreetMap<br/>paths and stops"]
-    worker --> s3[("S3<br/>shade files")]
+    worker -->|"saves"| s3
 ```
 
 1. The app asks the **API** for routes. The API gets the routes from Google Routes and the weather from Open-Meteo.
-2. The API checks the sun along every walking part of each route, hour by hour, using Google Solar's shade maps.
+2. The API checks the sun along every walking part of each route, hour by hour, using Google Solar's shade maps saved in S3.
 3. If an area has no shade data yet, the API answers straight away and adds a **shade job** to the database. The **worker** downloads the shade maps and the footpaths for that area, and the next request gets full results.
 4. The portal uses the same data to rank footpaths by how much sun people walk through, and to test where new trees or shelters would help.
 
@@ -64,16 +67,11 @@ Mac/Linux: `cp .env.example .env`.
 **4. Start the database**
 
 ```powershell
-docker compose -f docker-compose.dev.yml up -d
-```
-
-Wait about 10 seconds, then create the tables:
-
-```powershell
+docker compose -f docker-compose.dev.yml up -d --wait
 python -m scripts.migrate
 ```
 
-It prints `applied 0001_init.sql`.
+The first command returns once the database is ready. The second creates the tables and prints `applied 0001_init.sql`.
 
 **5. Run it with sample data** (no Google key needed)
 
@@ -100,7 +98,7 @@ curl -X POST http://127.0.0.1:8000/v1/routes/plan -H "X-Client-Id: me" -H "Conte
 
 You should see a `WALK` route with `11.3` sun minutes. This mode is enough for building the app and the portal. All endpoints are listed at http://127.0.0.1:8000/docs.
 
-**6. Run it with real data** (needs a Google API key with the Routes, Solar and Air Quality APIs turned on)
+**6. Run it with real data** (needs a Google API key from a Google Cloud project with billing on and the Routes, Solar and Air Quality APIs turned on)
 
 Stop the API (Ctrl+C). In `.env`, set `GOOGLE_API_KEY=your-key` and `USE_FAKES=false`. Then use three terminals, each with the virtual environment activated:
 
@@ -122,6 +120,8 @@ python -m scripts.seed_zones
 python -m app.worker.demand
 ```
 
+If terminal 2 prints `Job ... failed` instead, the free map server was busy. Run the preload command again (it only fetches what is still missing) and wait for `Job ... done`.
+
 Ask for the same route as in step 5. You should again see `WALK` with `11.3` sun minutes, now worked out from real shade data, plus an `ERICKSHAW` option.
 
 **Before you push**
@@ -131,4 +131,4 @@ ruff check .
 ruff format --check .
 ```
 
-Both must pass. GitHub runs them on every push.
+Both must pass. GitHub runs the same checks on every pull request and every push to `main`.
