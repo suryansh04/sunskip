@@ -77,4 +77,5 @@ async def score_cells(cells: list[str]) -> None:
         await save_segment_shade([segment_id for segment_id, _ in ready], segment_rows)
     if stops:
         # Stops keep only hours where at least one pixel had data
-        await save_stop_shade([stop_id for stop_id, _ in stops], [row[:4] for row in stop_rows if row[4] < 1])
+        known_rows = [(stop, month, hour, sun) for stop, month, hour, sun, nodata in stop_rows if nodata < 1]
+        await save_stop_shade([stop_id for stop_id, _ in stops], known_rows)

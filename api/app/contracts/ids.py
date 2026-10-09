@@ -17,6 +17,6 @@ def stretch_code(stretch_id: int | None) -> str | None:
 
 def stretch_number(code: str) -> int:
     number = code.removeprefix(STRETCH_PREFIX)
-    if not code.startswith(STRETCH_PREFIX) or not number.isdigit() or int(number) > MAX_DB_ID:
+    if not code.startswith(STRETCH_PREFIX) or not (number.isascii() and number.isdecimal()) or int(number) > MAX_DB_ID:
         raise ApiError(404, "NOT_FOUND", "Unknown stretch")
     return int(number)

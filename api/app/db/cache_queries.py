@@ -1,6 +1,7 @@
 from app.db.pool import get_pool
 
-STALE_LIMIT = "interval '24 hours'"
+STALE_LIMIT = "interval '24 hours'"  # how old a cached answer may be when the source is down
+ROUTES_TTL = "interval '24 hours'"
 
 
 def conditions_cell_id(lat: float, lng: float) -> str:
@@ -24,10 +25,10 @@ async def read_routes_cache(cache_key: str) -> dict | None:
 
 async def write_routes_cache(cache_key: str, response: dict) -> None:
     await get_pool().execute(
-        """
-        INSERT INTO google_routes_cache (cache_key, response) VALUES ($1, $2)
+        f"""
+        INSERT INTO google_routes_cache (cache_key, response, expires_at) VALUES ($1, $2, now() + {ROUTES_TTL})
         ON CONFLICT (cache_key) DO UPDATE
-        SET response = EXCLUDED.response, created_at = now(), expires_at = now() + interval '24 hours'
+        SET response = EXCLUDED.response, created_at = now(), expires_at = EXCLUDED.expires_at
         """,
         cache_key,
         response,

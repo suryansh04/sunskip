@@ -5,6 +5,7 @@ from uuid import UUID
 import asyncpg
 
 from app.db.pool import get_pool
+from app.db.status_queries import THIS_MONTH_IST
 
 CELL_GRID_DEG = 0.0003  # sample spacing small enough to hit every ~150 m geohash cell
 
@@ -129,9 +130,9 @@ async def claim_cell(geohash: str) -> asyncpg.Record | None:
 
 async def count_solar_call() -> int:
     return await get_pool().fetchval(
-        """
+        f"""
         INSERT INTO solar_usage (month_start, calls)
-        VALUES (date_trunc('month', now() AT TIME ZONE 'Asia/Kolkata')::date, 1)
+        VALUES ({THIS_MONTH_IST}, 1)
         ON CONFLICT (month_start) DO UPDATE SET calls = solar_usage.calls + 1
         RETURNING calls
         """

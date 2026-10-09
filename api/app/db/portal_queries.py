@@ -42,7 +42,7 @@ HEAT_PAIN_SQL = """
 WITH seg AS (
   SELECT s.stretch_id, s.length_m,
          COALESCE(d.walkers_per_day, 0) AS walkers, COALESCE(d.app_trips_30d, 0) AS app_trips,
-         COALESCE(avg(sh.sun_fraction), 0) AS sun
+         COALESCE(avg(sh.sun_fraction) FILTER (WHERE sh.nodata_fraction < 1), 0) AS sun
   FROM segments s
   LEFT JOIN demand_estimates d ON d.segment_id = s.id
   LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = $5 AND sh.hour BETWEEN $6 AND $7
@@ -87,12 +87,12 @@ async def load_stretch(stretch_id: int) -> asyncpg.Record | None:
 
 
 async def load_stretch_sun(stretch_id: int) -> list[asyncpg.Record]:
-    """Length-weighted sun share for every month and hour that has a row (sun >= 5° up)."""
+    """Length-weighted sun share for every month and hour with data (sun >= 5° up and not all no-data)."""
     return await get_pool().fetch(
         """
         SELECT sh.month, sh.hour, sum(sh.sun_fraction * s.length_m) / sum(s.length_m) AS sun
         FROM segments s JOIN segment_shade sh ON sh.segment_id = s.id
-        WHERE s.stretch_id = $1
+        WHERE s.stretch_id = $1 AND sh.nodata_fraction < 1
         GROUP BY sh.month, sh.hour
         """,
         stretch_id,

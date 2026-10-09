@@ -4,6 +4,8 @@ from typing import Literal
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
 
+from app.core.geo import MAX_LAT, MAX_LNG
+
 Mode = Literal["WALK", "BUS", "METRO", "RAIL", "ERICKSHAW"]
 RouteWarning = Literal[
     "HEAT_ALERT",
@@ -20,13 +22,13 @@ class ApiModel(BaseModel):
 
 
 class LatLng(ApiModel):
-    lat: float = Field(ge=-90, le=90)
-    lng: float = Field(ge=-180, le=180)
+    lat: float = Field(ge=-MAX_LAT, le=MAX_LAT)
+    lng: float = Field(ge=-MAX_LNG, le=MAX_LNG)
 
 
 class PlaceInput(ApiModel):
-    lat: float | None = Field(default=None, ge=-90, le=90)
-    lng: float | None = Field(default=None, ge=-180, le=180)
+    lat: float | None = Field(default=None, ge=-MAX_LAT, le=MAX_LAT)
+    lng: float | None = Field(default=None, ge=-MAX_LNG, le=MAX_LNG)
     query: str | None = Field(default=None, min_length=2, max_length=200)
 
     @model_validator(mode="after")

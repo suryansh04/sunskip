@@ -4,12 +4,14 @@ from itertools import pairwise
 Point = tuple[float, float]  # (lng, lat), same order as GeoJSON
 
 EARTH_RADIUS_M = 6371008.8
+MAX_LAT, MAX_LNG = 90.0, 180.0
+FULL_TURN_DEG = 360
 GEOHASH_ALPHABET = "0123456789bcdefghjkmnpqrstuvwxyz"
 BITS_PER_CHAR = 5
 
 
 def geohash_encode(lat: float, lng: float, precision: int) -> str:
-    lat_range, lng_range = [-90.0, 90.0], [-180.0, 180.0]
+    lat_range, lng_range = [-MAX_LAT, MAX_LAT], [-MAX_LNG, MAX_LNG]
     chars, char_value, bit_count, use_lng = [], 0, 0, True
     while len(chars) < precision:
         value_range, value = (lng_range, lng) if use_lng else (lat_range, lat)
@@ -34,12 +36,12 @@ def bearing_deg(a: Point, b: Point) -> float:
     lng1, lat1, lng2, lat2 = map(math.radians, (a[0], a[1], b[0], b[1]))
     x = math.sin(lng2 - lng1) * math.cos(lat2)
     y = math.cos(lat1) * math.sin(lat2) - math.sin(lat1) * math.cos(lat2) * math.cos(lng2 - lng1)
-    return (math.degrees(math.atan2(x, y)) + 360) % 360
+    return (math.degrees(math.atan2(x, y)) + FULL_TURN_DEG) % FULL_TURN_DEG
 
 
 def meters_per_degree(lat: float) -> tuple[float, float]:
     """(metres per degree of longitude, metres per degree of latitude) near this latitude."""
-    lat_m_per_deg = math.pi * EARTH_RADIUS_M / 180
+    lat_m_per_deg = math.radians(EARTH_RADIUS_M)  # arc length of one degree
     return lat_m_per_deg * math.cos(math.radians(lat)), lat_m_per_deg
 
 

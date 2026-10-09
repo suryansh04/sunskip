@@ -164,7 +164,7 @@ POI weights and distances are guesses, labelled as estimates in the portal.
 - **Kinds:**
   - `WEATHER` (Open-Meteo forecast);
   - `AIR` (Google, NAQI);
-  - `WEATHER_ARCHIVE` (same day last year, for dates over 7 days ahead; key gets `@YYYY-MM-DD`).
+  - `WEATHER_ARCHIVE` (past days older than 31 days, and the same weekday in an earlier year for dates over 7 days ahead; key gets `@YYYY-MM-DD`).
 - **Stale fallback** for up to 24 h.
 
 ---

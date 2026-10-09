@@ -13,7 +13,8 @@ WITH touched AS (
   WHERE s.shade_ready
     AND EXISTS (SELECT 1 FROM shade_cells c WHERE c.geohash = ANY($1) AND ST_Intersects(c.footprint, s.geom))
 )
-SELECT s.id, s.from_node, s.to_node, s.name, COALESCE(avg(sh.sun_fraction), 0) AS sun
+SELECT s.id, s.from_node, s.to_node, s.name,
+       COALESCE(avg(sh.sun_fraction) FILTER (WHERE sh.nodata_fraction < 1), 0) AS sun
 FROM segments s
 LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = $2 AND sh.hour BETWEEN $3 AND $4
 WHERE s.shade_ready
