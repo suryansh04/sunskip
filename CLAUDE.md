@@ -10,7 +10,7 @@ The docs in `docs/` are a **reference, not a contract to follow line by line** (
 - `docs/TRD.md`: stack, allowed packages, code rules, setup, deploy
 - `docs/api.md`: the 18 endpoints, data shapes, formulas
 - `docs/schema.md`: every table and the `0001_init` SQL
-- `docs/SETUP.md`: verified setup (local, fakes, real data), deploy and update steps, troubleshooting
+- `README.md`: verified setup (local, fakes, real data), deploy and update steps, troubleshooting
 
 If the code and the docs disagree, stop and ask. Don't guess. Keep the docs updated so they always describe what the code actually does.
 
@@ -43,7 +43,8 @@ If the code and the docs disagree, stop and ask. Don't guess. Keep the docs upda
 ```
 sunskip_app/
 ├── CLAUDE.md
-├── docs/                  PRD.md  TRD.md  api.md  schema.md  SETUP.md
+├── README.md              setup, deploy, verification record
+├── docs/                  PRD.md  TRD.md  api.md  schema.md
 ├── .github/workflows/     ci.yml (ruff for api, build for app + portal)
 ├── .gitignore
 │
