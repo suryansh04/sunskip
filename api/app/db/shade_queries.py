@@ -50,6 +50,14 @@ async def count_client_cells_today(client_hash: str) -> int:
     )
 
 
+async def list_done_cells_in_areas(areas: list[str]) -> list[str]:
+    """Fetched cells inside these OSM areas (a geohash-7 cell starts with its geohash-6 area)."""
+    rows = await get_pool().fetch(
+        "SELECT geohash FROM shade_cells WHERE left(geohash, 6) = ANY($1) AND status IN ('READY', 'NO_DATA')", areas
+    )
+    return [row["geohash"] for row in rows]
+
+
 async def queue_job(reason: str, client_hash: str | None, cells: list[str], areas: list[str]) -> str:
     async with get_pool().acquire() as connection, connection.transaction():
         await connection.execute(

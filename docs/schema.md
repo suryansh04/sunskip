@@ -87,7 +87,7 @@ Audio isn't stored in the database. It lives in S3 at `audio/{sha256(text|langua
   - max 60 new cells per client per day (a request queues what's left of that, the rest waits for the next day);
   - stop at 6,500 Solar calls a month (Google's free tier for India is 7,000).
 - **Crash recovery:** only one worker runs, so when it starts, any job left `RUNNING` goes back to `QUEUED` and any cell or OSM area left `FETCHING` goes back to `PENDING`. (A time limit would wrongly requeue a big preload job that's still running.)
-- **Failed jobs:** cells a failed job left `FETCHING` go back to `PENDING`. Any cell or OSM area that's not done and has no live job is queued again by the next request that needs it.
+- **Failed jobs:** a job still scores whatever it downloaded (a path is only ready once every point on it has shade data), and cells it left `FETCHING` go back to `PENDING`. A later job also scores fetched cells inside the OSM areas it loads, so paths from a retried area get their shade. Any cell or OSM area that's not done and has no live job is queued again by the next request that needs it.
 - **No duplicates:** every write is an upsert on a unique key, so retries are safe.
 
 ---
