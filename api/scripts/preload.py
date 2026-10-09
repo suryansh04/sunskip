@@ -38,16 +38,21 @@ async def preload(areas_to_load: list[tuple[dict, float]]) -> None:
         area_cells, area_osm = await missing_work(area, buffer_m)
         cells.update(area_cells)
         osm_areas.update(area_osm)
+    if not cells and not osm_areas:
+        print("Nothing to load: this area is ready")
+        return
     calls, budget = await get_solar_calls_this_month(), settings.solar_monthly_call_budget
     if calls + len(cells) > budget:
         print(f"Stopped: {len(cells)} cells would pass the Solar budget ({calls} used of {budget})")
         return
     ordered = sorted(cells)
     chunk = settings.max_cells_per_job
-    for start in range(0, len(ordered), chunk):
+    # At least one job, even when only OSM areas are missing (e.g. a re-run after the map server was busy)
+    batches = [ordered[start : start + chunk] for start in range(0, len(ordered), chunk)] or [[]]
+    for index, batch in enumerate(batches):
         # The first job loads all the OSM areas; jobs run in order, so later ones find them ready
-        job_osm = sorted(osm_areas) if start == 0 else []
-        job_id = await queue_job("PRELOAD", None, ordered[start : start + chunk], job_osm)
+        job_osm = sorted(osm_areas) if index == 0 else []
+        job_id = await queue_job("PRELOAD", None, batch, job_osm)
         print(f"queued {job_id}")
     print(f"{len(cells)} cells and {len(osm_areas)} OSM areas queued")
 
