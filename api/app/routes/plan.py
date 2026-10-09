@@ -45,14 +45,30 @@ def route_fare(route: dict, legs: list[Leg]) -> int | None:
     return route_fare_inr(route)
 
 
+def route_signature(legs: list[Leg]) -> tuple:
+    return tuple((leg.mode, leg.line.short_name if leg.line else None) for leg in legs)
+
+
 def unique_routes(routes: list[tuple[list[Leg], int | None]]) -> list[tuple[list[Leg], int | None]]:
     seen, unique = set(), []
     for legs, fare in routes:
-        signature = tuple((leg.mode, leg.line.short_name if leg.line else None) for leg in legs)
-        if legs and signature not in seen:
-            seen.add(signature)
+        if legs and route_signature(legs) not in seen:
+            seen.add(route_signature(legs))
             unique.append((legs, fare))
     return unique
+
+
+async def erickshaw_options(
+    options: list[RouteOption], depart_at: datetime, feels_like: dict, shade: Shade
+) -> list[RouteOption]:
+    """E-rickshaw copies of the options. A walk and its cooler copy become the same ride, so each ride is kept once."""
+    seen, swaps = set(), []
+    for option in options:
+        swap = await erickshaw_option(option, depart_at, feels_like, shade)
+        if swap and route_signature(swap.legs) not in seen:
+            seen.add(route_signature(swap.legs))
+            swaps.append(swap)
+    return swaps
 
 
 async def trip_conditions(legs: list[Leg], depart_at: datetime) -> tuple[TripConditions, dict]:
@@ -98,8 +114,7 @@ async def build_plan(request: PlanRequest, depart_at: datetime, client_hash: str
             cooler, _ = await build_option(cooler_legs, fare, depart_at, feels_like, shade, prefer_cooler=True)
             options.append(cooler)
     if request.allow_erickshaw:
-        swaps = [await erickshaw_option(option, depart_at, feels_like, shade) for option in options]
-        options += [swap for swap in swaps if swap]
+        options += await erickshaw_options(options, depart_at, feels_like, shade)
     ranked = rank_options(options, request.preference)[: settings.max_options]
     return PlanResponse(trip_id=str(uuid.uuid4()), shade=shade, conditions=conditions, options=ranked)
 
