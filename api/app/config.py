@@ -20,7 +20,7 @@ class Settings(BaseSettings):
 
     # Deploy
     secret_id: str = ""
-    aws_region: str = "ap-south-1"
+    aws_region: str = "ap-southeast-2"
     s3_bucket: str = ""
     origin_secret_check: bool = True
     use_fakes: bool = False

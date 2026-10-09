@@ -374,7 +374,7 @@ We use **Cognito's hosted login page** with a redirect. There is no auth library
 **`src/auth.ts`**
 
 ```ts
-const domain = import.meta.env.VITE_COGNITO_DOMAIN; // https://sunskip.auth.ap-south-1.amazoncognito.com
+const domain = import.meta.env.VITE_COGNITO_DOMAIN; // https://sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com
 const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
 const redirect = window.location.origin + "/callback";
 
@@ -414,7 +414,7 @@ export function logout() {
   - enable the **implicit grant** with scopes `openid email`;
   - callback URLs: `http://localhost:5174/callback` and the portal's Amplify URL + `/callback`;
   - sign-out URLs: the same origins.
-- **API Gateway JWT authorizer:** issuer `https://cognito-idp.ap-south-1.amazonaws.com/<userPoolId>`, audience = the app client id (the ID token's `aud`).
+- **API Gateway JWT authorizer:** issuer `https://cognito-idp.ap-southeast-2.amazonaws.com/<userPoolId>`, audience = the app client id (the ID token's `aud`).
 - **Trade-off:** implicit grant is the least code. Tokens last 1 hour, and then users log in again. That's fine for a hackathon. Switch to code + PKCE later.
 
 ---
@@ -498,15 +498,15 @@ api/
 
 | Service         | Setting                                                                                                                                                                                                                                                                                                   |
 | --------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Region          | `ap-south-1` (Mumbai) for everything                                                                                                                                                                                                                                                                      |
-| EC2             | Ubuntu 24.04, `t3.medium` (4 GB, for rasterio + numpy + graphs), Elastic IP, Docker + compose. Port 8000 must be open, because API Gateway has no fixed IPs; the origin secret blocks direct calls                                                                                                        |
+| Region          | `ap-southeast-2` (Sydney) for everything: the AWS free-plan project is locked to one region, and Mumbai isn't allowed                                                                                                                                                                                                                                                                      |
+| EC2             | Ubuntu 24.04, `c7i-flex.large` (4 GB, for rasterio + numpy + graphs; the free plan only allows free-tier types, so not `t3.medium`), Elastic IP, Docker + compose. Port 8000 must be open, because API Gateway has no fixed IPs; the origin secret blocks direct calls                                                                                                        |
 | RDS             | PostgreSQL 16, `db.t4g.micro`, 20 GB, not public; `CREATE EXTENSION postgis` via `0001_init`                                                                                                                                                                                                              |
 | S3              | One private bucket: `shade/`, `audio/`                                                                                                                                                                                                                                                                    |
 | Secrets Manager | `sunskip/prod`: Google, Anthropic, Sarvam keys, `DATABASE_URL`, `ORIGIN_SECRET`, `CLIENT_ID_SALT`                                                                                                                                                                                                         |
 | API Gateway     | HTTP API, 2 routes (§8.1 step 8); parameter mapping `overwrite:header.X-Origin-Secret` on both integrations; JWT authorizer only on the portal route; throttle 50 req/s; **CORS** for the two Amplify URLs + `localhost:5173` + `localhost:5174`, with headers `Content-Type, X-Client-Id, Authorization` |
 | Cognito         | User pool + public app client, hosted login, implicit grant (§4.1)                                                                                                                                                                                                                                        |
 | Amplify Hosting | Two apps from the same GitHub repo, branch `main`: tick **"My app is a monorepo"** and set the app root to `app` for one and `portal` for the other; SPA rewrite rule below; env vars as in §9                                                                                                         |
-| IAM             | EC2 role: S3 read/write on the bucket, read on the secret                                                                                                                                                                                                                                                 |
+| IAM             | EC2 role `sunskip-ec2`: S3 read/write on the bucket, read on the secret, Systems Manager (no SSH key, port 22 closed)                                                                                                                                                                                                                                                 |
 
 - **Amplify SPA rewrite** (Rewrites and redirects, type 200, target `/index.html`). This is the Amplify docs rule plus `webmanifest` for the PWA:
   ```
@@ -514,7 +514,9 @@ api/
   ```
   Page URLs load the app; JS, CSS, icons and the manifest still load (tested). A plain `/<*>` rule would break them.
 - **CORS lives in API Gateway only.** Don't add CORS in FastAPI too, or the headers get doubled.
-- **Cost:** stop EC2 and RDS when they're not needed after the hackathon.
+- **Cost:** about $3/day from the free-plan credits (EC2 ~$2.3, RDS ~$0.7). Stop EC2 and RDS when they're not needed after the hackathon.
+- **Live (deployed 9 Oct):** API `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1`, bucket `sunskip-shade-056362973989`, database `sunskip-db`, secret `sunskip/prod`, Cognito domain `sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com`. Containers must reach the instance role, so the EC2 metadata hop limit is 2.
+- **How it was deployed:** the repo has no GitHub remote yet, so the code went up as a `git archive` of `api/` in S3 and was set up on the server through Systems Manager; the local database was copied as a data-only `pg_dump` of the shade, map and demand tables (no request logs) and the shade files with `aws s3 sync`, so no Solar calls were spent again.
 
 ### 8.1 Deploy the API + worker (Docker on EC2)
 
@@ -600,7 +602,7 @@ services:
 
 **One-time setup (Thu night)**
 
-1. **Launch EC2:** Ubuntu 24.04, `t3.medium`, `ap-south-1`.
+1. **Launch EC2:** Ubuntu 24.04, `c7i-flex.large`, `ap-southeast-2`.
    - Attach an **Elastic IP** and the **IAM role** from the table above.
    - Security group: port 22 from your IP only; port 8000 open.
 2. **RDS access:** in the RDS security group, allow port 5432 **only from the EC2 security group**.
@@ -610,7 +612,7 @@ services:
    sudo usermod -aG docker ubuntu && newgrp docker
    git clone <sunskip repo> sunskip && cd sunskip/api
    ```
-4. **Create `.env`:** only non-secret settings plus `AWS_REGION=ap-south-1` and `SECRET_ID=sunskip/prod`. `config.py` reads the keys from Secrets Manager through the IAM role, so no keys sit on disk.
+4. **Create `.env`:** only non-secret settings plus `AWS_REGION=ap-southeast-2`, `S3_BUCKET` and `SECRET_ID=sunskip/prod`. `config.py` reads the keys from Secrets Manager through the IAM role, so no keys sit on disk.
 5. **Create the tables:**
    ```bash
    docker compose run --rm api python -m scripts.migrate
@@ -634,7 +636,7 @@ services:
    - The more specific portal route wins, so `/portal/*` always needs a login.
    - On **both** integrations add the request parameter `overwrite:header.X-Origin-Secret` = the `ORIGIN_SECRET` value. `overwrite` replaces any value a caller sends.
    - CORS is set on the API, so the gateway answers browser `OPTIONS` pre-checks itself, before the authorizer.
-   - The public URL is then `https://<api-id>.execute-api.ap-south-1.amazonaws.com/v1/...`, matching `api.md`.
+   - The public URL is then `https://<api-id>.execute-api.ap-southeast-2.amazonaws.com/v1/...`, matching `api.md`.
 
 **Updating** (after each merge to `main`, before demos)
 
@@ -655,7 +657,7 @@ cd sunskip/api && git pull && docker compose up -d --build
 
 | Folder      | Variable                                        | Example                                                                                               |
 | ----------- | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------- |
-| app, portal | `VITE_API_BASE_URL`                             | `/v1` locally (Vite forwards it); `https://abc123.execute-api.ap-south-1.amazonaws.com/v1` on Amplify |
+| app, portal | `VITE_API_BASE_URL`                             | `/v1` locally (Vite forwards it); `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1` on Amplify |
 | app, portal | `VITE_USE_MOCKS`                                | `true` locally until the API is up                                                                    |
 | app, portal | `VITE_MAP_STYLE_URL`                            | `https://tiles.openfreemap.org/styles/liberty`                                                        |
 | portal      | `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID` | from Cognito                                                                                          |
