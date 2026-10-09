@@ -115,7 +115,7 @@ async def build_plan(request: PlanRequest, depart_at: datetime, client_hash: str
             options.append(cooler)
     if request.allow_erickshaw:
         options += await erickshaw_options(options, depart_at, feels_like, shade)
-    ranked = rank_options(options, request.preference)[: settings.max_options]
+    ranked = rank_options(options, request.preference, settings.max_options)
     return PlanResponse(trip_id=str(uuid.uuid4()), shade=shade, conditions=conditions, options=ranked)
 
 
