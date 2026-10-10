@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { isLive } from "../api/live";
 import { bboxAround, boxAround, sunnyShare } from "../geo";
-import { dayLabel, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
+import { dayLabel, dayWord, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
 import { addRecentPlace, MUJ_MAIN_GATE, NEW_SEARCH, recall, recentPlaces, remember } from "../session";
 import MapView from "../components/MapView";
 import Sheet from "../components/Sheet";
@@ -112,8 +112,9 @@ export default function Home() {
         : `${share}% of streets near you in sun`;
   const whenOptions = [
     { value: "now", label: "Leave now" },
-    { value: "leave", label: search.when === "leave" && search.at ? `Leave ${hourLabel(hourOf(search.at))}` : "Leave at…" },
-    { value: "arrive", label: search.when === "arrive" && search.at ? `Arrive ${hourLabel(hourOf(search.at))}` : "Arrive by…" },
+    // A time for tomorrow says so ("Leave 8 AM tmrw"); the time sheet shows the full day
+    { value: "leave", label: search.when === "leave" && search.at ? `Leave ${hourLabel(hourOf(search.at))}${dayWord(search.at) === " tomorrow" ? " tmrw" : ""}` : "Leave at…" },
+    { value: "arrive", label: search.when === "arrive" && search.at ? `Arrive ${hourLabel(hourOf(search.at))}${dayWord(search.at) === " tomorrow" ? " tmrw" : ""}` : "Arrive by…" },
   ];
   const recents = recentPlaces();
   const center = origin || MUJ_MAIN_GATE;
