@@ -1,14 +1,16 @@
 import { useEffect, useState } from "react";
-import { useNavigate, useParams } from "react-router";
-import { CaretRight, CloudSlash, HourglassMedium, MapPin, Signpost, Warning, WifiSlash } from "@phosphor-icons/react";
+import { useNavigate, useParams, useSearchParams } from "react-router";
+import { CaretRight, ChatCircleDots, CloudSlash, HourglassMedium, MapPin, Signpost, Warning, WifiSlash } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
+import { isLive } from "../api/live";
 import { boundsOf, optionLines } from "../geo";
-import { duration, errorMessage, istIso, now, shortTime, timeOf } from "../format";
+import { dayLabel, duration, errorMessage, istIso, now, shortTime, timeOf } from "../format";
 import { planRequest, recall } from "../session";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
 import Sheet from "../components/Sheet";
+import RoundButton from "../components/RoundButton";
 import Button from "../components/Button";
 import HeatLine from "../components/HeatLine";
 import HeatSheet from "../components/HeatSheet";
@@ -16,6 +18,7 @@ import RouteCard from "../components/RouteCard";
 import ShadeNotice from "../components/ShadeNotice";
 import StateMessage from "../components/StateMessage";
 import OptionDetail from "./OptionDetail";
+import ChatPanel from "../features/agent/ChatPanel";
 
 const START_ZOOM = 14.5;
 const STATE_ICON_PX = 30;
@@ -40,6 +43,7 @@ function leaveTimeFor(body) {
 export default function Results() {
   const navigate = useNavigate();
   const { optionId } = useParams();
+  const [params, setParams] = useSearchParams();
   const [search] = useState(() => recall("search"));
   // The last plan request is kept so a re-plan sends the same body (TRD §3)
   const [request, setRequest] = useState(null);
@@ -51,6 +55,7 @@ export default function Results() {
   const [attempt, setAttempt] = useState(0);
   const [heatOpen, setHeatOpen] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
+  const [askLive, setAskLive] = useState(false);
   const { progress, gaveUp } = useShadeJob(plan?.shade, replan);
   const hasSearch = Boolean(search?.origin && search?.destination);
   const options = plan?.options || [];
@@ -74,6 +79,10 @@ export default function Results() {
       .catch((err) => setFailure(failureOf(err)))
       .finally(() => setLoading(false));
   }, [attempt]);
+
+  useEffect(() => {
+    isLive("/agent/chat").then(setAskLive);
+  }, []);
 
   useEffect(() => {
     setPoints([]);
@@ -131,7 +140,13 @@ export default function Results() {
         title={destination.name}
         subtitle={detail ? `Arrive ${timeOf(shown.arriveAt)} · ${duration(shown.durationSeconds)}` : `From ${origin.name || "your location"} · ${whenText}`}
         onBack={() => navigate(detail ? "/results" : "/")}
-      />
+      >
+        {askLive && !detail && (
+          <RoundButton label="Ask SunSkip" onClick={() => setParams({ ask: "text" })}>
+            <ChatCircleDots size={22} weight="bold" />
+          </RoundButton>
+        )}
+      </TopBar>
 
       {detail ? (
         <OptionDetail tripId={plan.tripId} option={shown} points={points} search={search} onResize={setSheetHeight} onExpired={planAgain} />
@@ -229,6 +244,15 @@ export default function Results() {
         </Sheet>
       )}
 
+      {params.has("ask") && (
+        <ChatPanel
+          tripId={plan?.tripId || null}
+          location={{ lat: origin.lat, lng: origin.lng }}
+          about={`Answers use your trip's real numbers: ${origin.name || "your location"} to ${destination.name}, ${dayLabel(departAt)}.`}
+          listen={params.get("ask") === "voice"}
+          onClose={() => navigate(-1)}
+        />
+      )}
       {heatOpen && <HeatSheet place={origin} placeName={origin.name || "Your location"} at={departAt} onClose={() => setHeatOpen(false)} />}
     </main>
   );

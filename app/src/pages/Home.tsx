@@ -1,8 +1,9 @@
 import { useEffect, useState } from "react";
-import { useNavigate } from "react-router";
-import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifold, ThermometerHot } from "@phosphor-icons/react";
+import { useNavigate, useSearchParams } from "react-router";
+import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifold, Microphone, ThermometerHot } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
+import { isLive } from "../api/live";
 import { bboxAround, boxAround, sunnyShare } from "../geo";
 import { dayLabel, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
 import { addRecentPlace, MUJ_MAIN_GATE, NEW_SEARCH, recall, recentPlaces, remember } from "../session";
@@ -13,6 +14,7 @@ import RoundButton from "../components/RoundButton";
 import Segmented from "../components/Segmented";
 import HeatSheet from "../components/HeatSheet";
 import TimeSheet from "../components/TimeSheet";
+import ChatPanel from "../features/agent/ChatPanel";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 const HOME_MAX_ZOOM = 15.6;
@@ -32,6 +34,7 @@ function dayStart(iso) {
 
 export default function Home() {
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
   const nowIso = istIso(now());
   const [search, setSearch] = useState(() => recall("search") || NEW_SEARCH);
   const [conditions, setConditions] = useState(null);
@@ -43,6 +46,7 @@ export default function Home() {
   const [heatOpen, setHeatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState("");
   const [shadeAttempt, setShadeAttempt] = useState(0);
+  const [askLive, setAskLive] = useState(false);
   // Streets still being prepared show up by themselves when their shade job is done
   useShadeJob(streets?.shade, () => setShadeAttempt(shadeAttempt + 1));
   const { origin, destination } = search;
@@ -66,6 +70,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!origin) locate();
+    isLive("/agent/chat").then(setAskLive);
   }, []);
 
   useEffect(() => {
@@ -167,13 +172,20 @@ export default function Home() {
       </div>
 
       <Sheet label="Plan a trip" className="px-4 pt-1.5 pb-[18px]" onResize={setSheetHeight}>
-        <button type="button" onClick={() => navigate("/search")} className="press mt-3 flex min-h-[58px] w-full items-center gap-3 rounded-[14px] bg-sunken px-3.5">
-          <MagnifyingGlass size={20} weight="bold" className="flex-none text-muted" />
-          <span className="min-w-0 flex-1">
-            <small className="block text-[13px] leading-[1.2] text-muted">Where to?</small>
-            <b className={`block truncate text-[17px] leading-[1.3] font-semibold ${destination ? "" : "text-muted"}`}>{destination ? destination.name : "Search for a place"}</b>
-          </span>
-        </button>
+        <div className="mt-3 flex min-h-[58px] items-center gap-3 rounded-[14px] bg-sunken px-3.5">
+          <button type="button" onClick={() => navigate("/search")} className="flex min-h-[58px] min-w-0 flex-1 items-center gap-3">
+            <MagnifyingGlass size={20} weight="bold" className="flex-none text-muted" />
+            <span className="min-w-0 flex-1">
+              <small className="block text-[13px] leading-[1.2] text-muted">Where to?</small>
+              <b className={`block truncate text-[17px] leading-[1.3] font-semibold ${destination ? "" : "text-muted"}`}>{destination ? destination.name : "Search for a place"}</b>
+            </span>
+          </button>
+          {askLive && (
+            <button type="button" aria-label="Ask by voice" onClick={() => setParams({ ask: "voice" })} className="press grid size-11 flex-none place-items-center rounded-xl bg-ink text-white">
+              <Microphone size={22} weight="fill" />
+            </button>
+          )}
+        </div>
         <p className="flex items-center gap-2.5 px-1 pt-2.5 text-[15px] text-muted">
           <i className="size-2.5 flex-none rounded-full shadow-[inset_0_0_0_2.5px_var(--color-ink)]" />
           {fromLine(origin)}
@@ -221,6 +233,15 @@ export default function Home() {
       </Sheet>
 
       {heatOpen && <HeatSheet place={origin} placeName={origin.name || "Your location"} at={nowIso} onClose={() => setHeatOpen(false)} />}
+      {params.has("ask") && (
+        <ChatPanel
+          tripId={null}
+          location={origin && { lat: origin.lat, lng: origin.lng }}
+          about="Answers use SunSkip's real numbers for where you are."
+          listen={params.get("ask") === "voice"}
+          onClose={() => navigate(-1)}
+        />
+      )}
       {timeMode && (
         <TimeSheet
           search={{ ...search, when: timeMode }}
