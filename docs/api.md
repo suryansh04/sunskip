@@ -174,7 +174,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 ---
 
-## 5. Endpoints (18)
+## 5. Endpoints (19)
 
 | #   | Endpoint                                            | Used by     | Owner              |
 | --- | --------------------------------------------------- | ----------- | ------------------ |
@@ -196,6 +196,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | 16  | `POST /portal/simulate`                             | portal      | P1                 |
 | 17  | `GET /portal/stretches/{stretchId}`                 | portal      | P1                 |
 | 18  | `GET /health`                                       | team        | P1                 |
+| 19  | `GET /places`                                       | app         | P1                 |
 
 - **Auth:** `/portal/*` needs a Cognito login (checked by API Gateway). Every other endpoint, including 1 and 3 when the portal calls them, needs only `X-Client-Id` (both front ends always send it). `/health` needs neither (only the gateway secret).
 - **Owners:** P1 = Suryansh (backend + front ends), P2 = AI/voice, P3 = AR.
@@ -485,6 +486,15 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Body:** `{ "optionId": "opt_2" }`.
 - **Returns:** `204`. The last choice wins. `404` if the trip or option is unknown.
+
+### 19. `GET /places?q=&lat=&lng=`
+
+**Does:** finds named places near the walker for the destination search: hostels, campus gates, colleges, food, shops and bus or metro stops that OSM knows (the `pois` and `stops` tables). Only areas the worker has fetched are searched; the app keeps Google (`query` in `/routes/plan`) as the fallback.
+
+- **Query:** `q` (2 to 100 letters, any part of the name), `lat`, `lng` (where the walker is, or the picked start).
+- **Nicknames:** `ghs` / `girls hostel` also match the girls' blocks (`G3 block`), `bhs` / `boys hostel` the boys' blocks (`B1 Block`).
+- **Returns:** `{ "places": [ { "name": "G3 block", "kind": "HOSTEL", "location": { "lat": 26.8406, "lng": 75.563 }, "distanceM": 14 } ] }`, nearest first, one row per name, at most `PLACES_LIMIT`, within `PLACES_RADIUS_M`. `kind` is a `pois` kind (`HOSTEL`, `CAMPUS_GATE`, `ACADEMIC`, `FOOD`, `SHOP`, `OTHER`) or a stop kind (`BUS`, `METRO`). No match is an empty list.
+- **Errors:** `400 INVALID_REQUEST` when `q` is shorter than 2 letters or a point is missing.
 
 ---
 
@@ -829,6 +839,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `SHADE_ALPHA`, `MAX_DETOUR_RATIO`                                                                    | 3.0, 1.3                                  |
 | `DEFAULT_WAIT_SECONDS`, `LONG_WAIT_IN_SUN_MIN`                                                       | 300, 5                                    |
 | `WALK_ONLY_MAX_M`, `MAX_OPTIONS`                                                                     | 3000, 6                                   |
+| `PLACES_RADIUS_M`, `PLACES_LIMIT`                                                                    | 20000, 8                                  |
 | `SWAP_MIN_WALK_M`, `SWAP_MIN_HOT_SUN_MIN`                                                            | 500, 5                                    |
 | `ERICKSHAW_SPEED_MPS`, `ERICKSHAW_WAIT_SECONDS`                                                      | 4.2, 120                                  |
 | `WAYPOINT_SPACING_M`                                                                                 | 25                                        |

@@ -2,14 +2,17 @@ import { useEffect, useRef, useState } from "react";
 import { api } from "./client";
 import { planRequest } from "../session";
 import { istIso, now } from "../format";
+import { metersBetween } from "../geo";
 
 const OFF_PATH_M = 30; // further than this from the path...
 const OFF_FOR_MS = 8000; // ...for this long means a wrong turn, not a GPS wobble
 const TRY_GAP_MS = 20000; // at most one new plan this often
 const TRUSTED_FIX_M = 30; // a fix less sure than this can't tell a wrong turn from a wobble
+const NEAR_END_M = 50; // this close to the end there is nothing left to reroute
 
-function isOff(fix, snap) {
-  return Boolean(fix && snap && fix.accuracyM <= TRUSTED_FIX_M && snap.offsetM > OFF_PATH_M);
+function isOff(fix, snap, end) {
+  if (!fix || !snap || !end || fix.accuracyM > TRUSTED_FIX_M) return false;
+  return snap.offsetM > OFF_PATH_M && metersBetween(fix, end) > NEAR_END_M;
 }
 
 // The walk-only option of a plan with the fewest sun minutes, or the first when a count is unknown
@@ -33,7 +36,7 @@ export default function useReroute(fix, snap, end, resetKey) {
   useEffect(() => () => clearTimeout(timer.current), []);
 
   useEffect(() => {
-    if (!isOff(fix, snap)) {
+    if (!isOff(fix, snap, end)) {
       clearTimeout(timer.current);
       timer.current = null;
       return;
@@ -45,7 +48,7 @@ export default function useReroute(fix, snap, end, resetKey) {
   function planFromHere() {
     timer.current = null;
     const here = latest.current.fix;
-    if (!end || !isOff(here, latest.current.snap)) return;
+    if (!isOff(here, latest.current.snap, end)) return;
     lastTry.current = Date.now();
     setRerouting(true);
     api

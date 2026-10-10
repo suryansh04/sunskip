@@ -47,7 +47,7 @@ export function watchGps(
 }
 
 export interface FixSmoother {
-  /** Add a raw fix. Returns the filtered position if it moved enough to matter, else null. */
+  /** Add a raw fix. Returns the filtered fix if it moved or its accuracy changed enough to matter, else null. */
   push(fix: GpsFix): GpsFix | null
 }
 
@@ -81,7 +81,8 @@ export function createFixSmoother(): FixSmoother {
         }
         if (jumped) jumps = 0
       }
-      if (emitted && distanceM(emitted, estimate) < GPS_MIN_MOVE_M) return null
+      const moved = !emitted || distanceM(emitted, estimate) >= GPS_MIN_MOVE_M
+      if (!moved && Math.abs(emitted.accuracyM - estimate.accuracyM) < GPS_MIN_MOVE_M) return null
       emitted = estimate
       return estimate
     },

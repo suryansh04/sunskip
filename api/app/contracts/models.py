@@ -161,6 +161,17 @@ class Waypoint(ApiModel):
     cue: str | None = None
 
 
+class FoundPlace(ApiModel):
+    name: str
+    kind: str
+    location: LatLng
+    distance_m: int
+
+
+class PlacesResponse(ApiModel):
+    places: list[FoundPlace]
+
+
 class WaypointsResponse(ApiModel):
     spacing_m: float
     waypoints: list[Waypoint]

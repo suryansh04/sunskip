@@ -42,6 +42,8 @@ class Settings(BaseSettings):
     long_wait_in_sun_min: float = 5
     walk_only_max_m: float = 3000
     max_options: int = 6
+    places_radius_m: float = 20000  # /places looks for names this close to the walker
+    places_limit: int = 8
     swap_min_walk_m: float = 500
     swap_min_hot_sun_min: float = 5
     erickshaw_speed_mps: float = 4.2
