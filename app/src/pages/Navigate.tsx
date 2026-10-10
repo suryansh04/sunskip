@@ -2,7 +2,7 @@ import { lazy, Suspense, useEffect, useState } from "react";
 import { useLocation, useNavigate, useParams, useSearchParams } from "react-router";
 import { ClockCounterClockwise, CubeFocus, MapTrifold, PersonSimpleWalk, WifiSlash, X } from "@phosphor-icons/react";
 import { api } from "../api/client";
-import { bboxAround, metersLeft, nearestIndex, nextInstruction, stretchAhead, sunBit, sunMinutesLeft, walkPieces, WALK_SPEED_MPS } from "../geo";
+import { bboxAround, metersLeft, nextInstruction, stretchAhead, sunBit, sunMinutesLeft, walkPieces, WALK_SPEED_MPS } from "../geo";
 import { errorMessage, fmt, hourOf, istIso, now, timeOf } from "../format";
 import MapView from "../components/MapView";
 import Sheet from "../components/Sheet";
@@ -16,6 +16,9 @@ import StateMessage from "../components/StateMessage";
 import RideGuide from "../components/RideGuide";
 import { recall } from "../session";
 import SpokenDirections from "../features/voice/SpokenDirections";
+import { createFixSmoother, watchGps } from "../features/ar/gps";
+import { bearingAt, buildRoute, snapToRoute, waypointAt } from "../features/ar/route";
+import { SNAP_MAX_OFFSET_M } from "../features/ar/config";
 
 // three.js and LocAR load only when the AR view opens
 const ARView = lazy(() => import("../features/ar/index.ts").then((ar) => ({ default: ar.ARView })));
@@ -25,6 +28,7 @@ const MOCK_STEP = 6; // with mocks there is no GPS: the walker stands 6 waypoint
 const NAV_ZOOM = 17.4;
 const NAV_PITCH = 52;
 const STREET_OPACITY = 0.5;
+const WEAK_GPS_M = 30; // above this the fix could be on the next street, so say so
 const VIEWS = [
   { value: "map", label: "Map", icon: <MapTrifold size={20} weight="bold" /> },
   { value: "ar", label: "AR", icon: <CubeFocus size={20} weight="bold" /> },
@@ -43,6 +47,9 @@ export default function Navigate() {
   const [failure, setFailure] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [fix, setFix] = useState(null);
+  const [gpsOff, setGpsOff] = useState(false);
+  const [snap, setSnap] = useState(null);
+  const [route, setRoute] = useState(null);
   const [streets, setStreets] = useState(null);
   const [lines, setLines] = useState(null);
   const [voiceOn, setVoiceOn] = useState(true);
@@ -64,13 +71,27 @@ export default function Navigate() {
 
   useEffect(() => {
     if (USE_MOCKS || !navigator.geolocation) return;
-    const watch = navigator.geolocation.watchPosition(
-      (position) => setFix({ lat: position.coords.latitude, lng: position.coords.longitude }),
-      () => setFix(null),
-      { enableHighAccuracy: true },
+    const smoother = createFixSmoother();
+    return watchGps(
+      (raw) => {
+        setGpsOff(false);
+        const smoothed = smoother.push(raw);
+        if (smoothed) setFix(smoothed);
+      },
+      // A timeout while standing still is normal: keep the last fix
+      (failure) => setGpsOff(failure === "denied" || failure === "unsupported"),
     );
-    return () => navigator.geolocation.clearWatch(watch);
   }, []);
+
+  useEffect(() => {
+    setRoute(buildRoute((waypoints || []).filter((point) => point.legIndex === legIndex)));
+    setSnap(null);
+  }, [legKey]);
+
+  // Snap near where the walker last was, so a path that doubles back doesn't jump ahead
+  useEffect(() => {
+    if (route && fix) setSnap((last) => snapToRoute(route, fix, last?.progressM ?? null));
+  }, [route, fix]);
 
   useEffect(() => {
     const leg = (waypoints || []).filter((point) => point.legIndex === legIndex);
@@ -133,9 +154,19 @@ export default function Navigate() {
   }
 
   const last = points.length - 1;
-  const at = USE_MOCKS ? Math.min(Number(params.get("step") ?? MOCK_STEP), last) : fix ? nearestIndex(points, fix) : 0;
+  const at = USE_MOCKS ? Math.min(Number(params.get("step") ?? MOCK_STEP), last) : snap && route ? waypointAt(route, snap.progressM) : 0;
   const arrived = at === last;
   const here = points[at];
+  const onPath = snap && snap.offsetM <= SNAP_MAX_OFFSET_M;
+  const youAt = !snap ? here.location : onPath ? snap.point : fix;
+  const youBearing = snap && route ? bearingAt(route, snap.progressM) : here.bearingDeg;
+  const gpsNote = gpsOff
+    ? "Location is off, so your place on the walk isn't shown"
+    : fix && fix.accuracyM > WEAK_GPS_M
+      ? `GPS is weak here (±${Math.round(fix.accuracyM)} m)`
+      : snap && !onPath
+        ? `You're ${Math.round(snap.offsetM)} m from the path`
+        : "";
   const instruction = nextInstruction(points, at);
   const ahead = stretchAhead(points, at);
   const minutesToGo = Math.round(metersLeft(points, at) / WALK_SPEED_MPS / 60);
@@ -148,18 +179,19 @@ export default function Navigate() {
       {view === "map" && (
         <>
           <MapView
-            camera={{ center: [here.location.lng, here.location.lat], zoom: NAV_ZOOM, pitch: NAV_PITCH, bearing: here.bearingDeg }}
+            camera={{ center: [youAt.lng, youAt.lat], zoom: NAV_ZOOM, pitch: NAV_PITCH, bearing: youBearing }}
             padding={{ top: 140, bottom: sheetHeight, left: 0, right: 0 }}
             streets={streets}
             streetOpacity={STREET_OPACITY}
             lines={lines}
             start={null}
             end={[end.lng, end.lat]}
-            you={{ at: [here.location.lng, here.location.lat], bearing: here.bearingDeg }}
+            you={{ at: [youAt.lng, youAt.lat], bearing: youBearing }}
             creditBottom={sheetHeight + 6}
             onMoved={null}
           />
           <Sheet label="Your walk" className="px-5 pt-1.5 pb-[calc(16px+env(safe-area-inset-bottom))]" onResize={setSheetHeight}>
+            {gpsNote && <p className="mt-2 text-[13px] font-[650] text-alert">{gpsNote}</p>}
             <AheadCard ahead={ahead} className="mt-3" />
             <div className="mt-3.5 grid grid-cols-3">
               <div>

@@ -4,7 +4,7 @@ import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifol
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { isLive } from "../api/live";
-import { bboxAround, boxAround, sunnyShare } from "../geo";
+import { bboxAround, boxAround, metersBetween, sunnyShare } from "../geo";
 import { dayLabel, dayWord, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
 import { addRecentPlace, MUJ_MAIN_GATE, NEW_SEARCH, recall, recentPlaces, remember } from "../session";
 import MapView from "../components/MapView";
@@ -15,8 +15,12 @@ import Segmented from "../components/Segmented";
 import HeatSheet from "../components/HeatSheet";
 import TimeSheet from "../components/TimeSheet";
 import ChatPanel from "../features/agent/ChatPanel";
+import { createFixSmoother, watchGps } from "../features/ar/gps";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
+const LOCATE_GOOD_M = 15; // stop looking once the fix is this close
+const LOCATE_MAX_MS = 15000; // or after this long, keeping the best fix so far
+const LOCATE_MOVE_M = 25; // while looking, move the start only for a change this big (each move reloads the shade)
 const HOME_MAX_ZOOM = 15.6;
 const NEAR_YOU_M = 300; // how far around you the map shows at first
 const FIND_DOTS_MS = 400;
@@ -59,13 +63,35 @@ export default function Home() {
     });
   }
 
+  // The first fix is often a rough Wi-Fi or cell guess. Keep listening and move the start as the
+  // GPS settles, until it is close enough or time runs out.
   function locate() {
     if (USE_MOCKS || !navigator.geolocation) return update({ origin: { ...MUJ_MAIN_GATE, mine: USE_MOCKS } });
-    navigator.geolocation.getCurrentPosition(
-      (position) => update({ origin: { lat: position.coords.latitude, lng: position.coords.longitude, name: null, mine: true } }),
-      () => update({ origin: { ...MUJ_MAIN_GATE, mine: false } }),
-      { enableHighAccuracy: true, timeout: 10000 },
+    const smoother = createFixSmoother();
+    let best = null;
+    let shown = null;
+    const show = (fix) => {
+      shown = fix;
+      update({ origin: { lat: fix.lat, lng: fix.lng, name: null, mine: true } });
+    };
+    const stop = watchGps(
+      (raw) => {
+        best = smoother.push(raw) || best;
+        if (!best) return;
+        if (best.accuracyM <= LOCATE_GOOD_M) return finish();
+        if (!shown || metersBetween(shown, best) > LOCATE_MOVE_M) show(best);
+      },
+      () => {
+        if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false } });
+        finish();
+      },
     );
+    const timer = setTimeout(finish, LOCATE_MAX_MS);
+    function finish() {
+      clearTimeout(timer);
+      stop();
+      if (best && best !== shown) show(best);
+    }
   }
 
   useEffect(() => {

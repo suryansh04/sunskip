@@ -86,14 +86,6 @@ export function optionLines(option, points) {
   });
 }
 
-export function nearestIndex(points, location) {
-  let nearest = 0;
-  points.forEach((point, i) => {
-    if (metersBetween(point.location, location) < metersBetween(points[nearest].location, location)) nearest = i;
-  });
-  return nearest;
-}
-
 export function metersLeft(points, at) {
   let meters = 0;
   for (let i = at; i < points.length - 1; i++) meters += pieceMeters(points, i);

@@ -20,10 +20,18 @@ export const ORIENTATION_SMOOTHING_FACTOR = 0.3
 
 // --- GPS ----------------------------------------------------------------------------------------
 
-/** Moving average over this many GPS fixes. */
-export const GPS_AVERAGE_WINDOW = 3
+/** How far a walker can drift between fixes, in m/s: how much the filter trusts a new fix over the old position. */
+export const GPS_WALK_NOISE_MPS = 1.5
+/** A fix this many times further away than the filter and the fix's own accuracy explain is a jump, and dropped. */
+export const GPS_JUMP_SIGMAS = 3
+/** ...unless this many jumps come in a row: then the walker really is there (a tunnel, a long gap). */
+export const GPS_JUMPS_TO_ACCEPT = 3
+/** Fixes worse than this (cell towers, Wi-Fi guesses) are ignored once a better one has come in. */
+export const GPS_WORST_ACCURACY_M = 100
+/** How long to wait for a fix before reporting a timeout. */
+export const GPS_TIMEOUT_MS = 15000
 /** Ignore smoothed moves shorter than this. */
-export const GPS_MIN_MOVE_M = 2
+export const GPS_MIN_MOVE_M = 1
 /** GPS accuracy worse than this, for this long, swaps the 3D arrows for the 2D compass arrow. */
 export const GPS_GATE_ACCURACY_M = 15
 export const GPS_GATE_SECONDS = 5

@@ -97,6 +97,12 @@ export function segmentAt(route: Route, progressM: number): number {
   return i
 }
 
+/** Index of the waypoint closest to this progress. */
+export function waypointAt(route: Route, progressM: number): number {
+  const i = segmentAt(route, progressM)
+  return progressM - route.distances[i] <= route.distances[i + 1] - progressM ? i : i + 1
+}
+
 function flatAt(route: Route, progressM: number): Flat {
   const clamped = Math.min(Math.max(progressM, 0), route.lengthM)
   const i = segmentAt(route, clamped)

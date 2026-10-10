@@ -1,4 +1,4 @@
-import { GPS_AVERAGE_WINDOW, GPS_MIN_MOVE_M } from './config.ts'
+import { GPS_JUMP_SIGMAS, GPS_JUMPS_TO_ACCEPT, GPS_MIN_MOVE_M, GPS_WALK_NOISE_MPS, GPS_TIMEOUT_MS, GPS_WORST_ACCURACY_M } from './config.ts'
 import { distanceM } from './geo.ts'
 import type { LatLng } from './geo.ts'
 
@@ -41,31 +41,49 @@ export function watchGps(
       else if (error.code === error.TIMEOUT) onFailure('timeout')
       else onFailure('unavailable')
     },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: 15000 },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_TIMEOUT_MS },
   )
   return () => navigator.geolocation.clearWatch(watchId)
 }
 
 export interface FixSmoother {
-  /** Add a raw fix. Returns the smoothed position if it moved enough to matter, else null. */
-  push(fix: LatLng): LatLng | null
+  /** Add a raw fix. Returns the filtered position if it moved enough to matter, else null. */
+  push(fix: GpsFix): GpsFix | null
 }
 
-/** Moving average of the last few fixes that ignores small moves, to stop arrows jittering. */
+/**
+ * A small Kalman filter over the fixes. Each fix pulls the position in by how sure it is compared
+ * with the position we already have, which grows less sure the longer the walker has been moving.
+ * A fix far outside both is a jump (a reflection off a building) and is dropped.
+ */
 export function createFixSmoother(): FixSmoother {
-  const recent: LatLng[] = []
-  let emitted: LatLng | null = null
+  let estimate: GpsFix | null = null
+  let emitted: GpsFix | null = null
+  let jumps = 0
   return {
     push(fix) {
-      recent.push({ lat: fix.lat, lng: fix.lng })
-      if (recent.length > GPS_AVERAGE_WINDOW) recent.shift()
-      const mean: LatLng = {
-        lat: recent.reduce((sum, p) => sum + p.lat, 0) / recent.length,
-        lng: recent.reduce((sum, p) => sum + p.lng, 0) / recent.length,
+      if (estimate && fix.timestamp <= estimate.timestamp) return null
+      if (estimate && fix.accuracyM > GPS_WORST_ACCURACY_M && estimate.accuracyM <= GPS_WORST_ACCURACY_M) return null
+      if (!estimate) {
+        estimate = fix
+      } else {
+        const seconds = (fix.timestamp - estimate.timestamp) / 1000
+        const spreadSq = (estimate.accuracyM + seconds * GPS_WALK_NOISE_MPS) ** 2
+        const jumped = distanceM(estimate, fix) > GPS_JUMP_SIGMAS * Math.sqrt(spreadSq + fix.accuracyM ** 2)
+        jumps = jumped ? jumps + 1 : 0
+        if (jumped && jumps < GPS_JUMPS_TO_ACCEPT) return null
+        const gain = jumped ? 1 : spreadSq / (spreadSq + fix.accuracyM ** 2)
+        estimate = {
+          lat: estimate.lat + gain * (fix.lat - estimate.lat),
+          lng: estimate.lng + gain * (fix.lng - estimate.lng),
+          accuracyM: jumped ? fix.accuracyM : Math.sqrt((1 - gain) * spreadSq),
+          timestamp: fix.timestamp,
+        }
+        if (jumped) jumps = 0
       }
-      if (emitted && distanceM(emitted, mean) < GPS_MIN_MOVE_M) return null
-      emitted = mean
-      return mean
+      if (emitted && distanceM(emitted, estimate) < GPS_MIN_MOVE_M) return null
+      emitted = estimate
+      return estimate
     },
   }
 }
