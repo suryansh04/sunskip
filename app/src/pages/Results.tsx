@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { isLive } from "../api/live";
 import { boundsOf, optionLines } from "../geo";
-import { dayLabel, duration, errorMessage, istIso, now, shortTime, timeOf } from "../format";
+import { dayLabel, dayWord, duration, errorMessage, istIso, now, shortTime, timeOf } from "../format";
 import { planRequest, recall } from "../session";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
@@ -114,7 +114,12 @@ export default function Results() {
   const cellsTotal = progress?.cellsTotal ?? plan?.shade.cellsTotal;
   // For "arrive by" the API picks the leave time; every option leaves then
   const departAt = plan?.options[0]?.departAt || request?.departAt || istIso(now());
-  const whenText = search.when === "arrive" ? `arrive by ${shortTime(search.at)}` : search.when === "leave" ? `leave at ${shortTime(search.at)}` : `leave now, ${shortTime(departAt)}`;
+  const whenText =
+    search.when === "arrive"
+      ? `arrive by ${shortTime(search.at)}${dayWord(search.at)}`
+      : search.when === "leave"
+        ? `leave at ${shortTime(search.at)}${dayWord(search.at)}`
+        : `leave now, ${shortTime(departAt)}`;
   const detail = optionId && shown?.optionId === optionId && !loading && !failure;
   const tripCoords = shown ? shown.legs.flatMap((leg) => leg.polyline.coordinates) : [];
   const showList = plan && !loading && !failure;
@@ -134,7 +139,7 @@ export default function Results() {
       />
       <TopBar
         title={destination.name}
-        subtitle={detail ? `Arrive ${timeOf(shown.arriveAt)} · ${duration(shown.durationSeconds)}` : `From ${origin.name || "your location"} · ${whenText}`}
+        subtitle={detail ? `Arrive ${timeOf(shown.arriveAt)}${dayWord(shown.arriveAt)} · ${duration(shown.durationSeconds)}` : `From ${origin.name || "your location"} · ${whenText}`}
         onBack={() => navigate(detail ? "/results" : "/")}
       >
         {askLive && !detail && (

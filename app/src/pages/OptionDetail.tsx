@@ -16,7 +16,8 @@ export default function OptionDetail({ tripId, option, points, search, onResize,
   const sun = option.exposure.sunMinutes;
 
   function takeRoute() {
-    const startTrip = () => navigate(`/trip/${tripId}/${option.optionId}`);
+    // The option goes along, so a route with no walking can still be shown step by step
+    const startTrip = () => navigate(`/trip/${tripId}/${option.optionId}`, { state: { option } });
     setStarting(true);
     // The choice is the portal's demand signal. Only an expired trip (404) stops the walk; any other failed log doesn't.
     api
