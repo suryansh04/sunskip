@@ -7,6 +7,7 @@ from app.core.errors import ApiError
 from app.core.formulas import dose_weight, round_half_up
 from app.core.sun import sun_elevations
 from app.routes.exposure import LineShade, line_sun, load_line_shade, to_exposure
+from app.routes.options import TRANSIT_MODES, score_transit_leg
 from app.routes.plan import build_plan, trip_conditions
 
 MAX_WINDOW = timedelta(hours=14)
@@ -47,18 +48,24 @@ async def walk_lines(option: RouteOption) -> list[tuple[datetime, LineShade]] | 
     return lines
 
 
+async def stop_waits(option: RouteOption) -> list[tuple[float, datetime]]:
+    """Minutes waiting in sun at each boarding stop, and when (worked out on copies, so the plan stays as it is)."""
+    return [await score_transit_leg(leg.model_copy()) for leg in option.legs if leg.mode in TRANSIT_MODES]
+
+
 def shade_slots(
-    option: RouteOption, lines: list[tuple[datetime, LineShade]], slots: list[datetime], feels_like: dict
+    option: RouteOption,
+    lines: list[tuple[datetime, LineShade]],
+    waits: list[tuple[float, datetime]],
+    slots: list[datetime],
+    feels_like: dict,
 ) -> list[Slot]:
-    # Waiting stays the same minutes for every slot; it's counted in the hour of the first boarding
-    first_boarding = next((leg.start_at for leg in option.legs if leg.wait_seconds is not None), None)
-    wait_minutes = option.exposure.wait_sun_minutes or 0
+    # Each stop's wait keeps its minutes for every slot, counted in the hour that ride boards
     results = []
     for slot in slots:
         offset = slot - option.depart_at
         walks = [line_sun(line, start_at + offset, feels_like) for start_at, line in lines]
-        waits = [(wait_minutes, first_boarding + offset)] if first_boarding else []
-        exposure = to_exposure(walks, waits, feels_like)
+        exposure = to_exposure(walks, [(minutes, at + offset) for minutes, at in waits], feels_like)
         results.append(Slot(depart_at=slot, sun_minutes=exposure.sun_minutes, heat_dose=exposure.heat_dose))
     return results
 
@@ -106,5 +113,5 @@ async def find_best_time(request: BestTimeRequest, client_hash: str) -> BestTime
         return BestTimeResponse(
             basis="TEMPERATURE_ONLY", shade=plan.shade, slots=results, best=pick_best(results, False), note=NOTE
         )
-    results = shade_slots(top, lines, slots, feels_like)
+    results = shade_slots(top, lines, await stop_waits(top), slots, feels_like)
     return BestTimeResponse(basis="SHADE", shade=plan.shade, slots=results, best=pick_best(results, True), note=NOTE)

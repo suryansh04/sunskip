@@ -1,7 +1,9 @@
+from datetime import datetime
 from uuid import UUID
 
 from fastapi import APIRouter, Request, Response
 
+from app.conditions.report import as_ist
 from app.config import settings
 from app.contracts.fakes import fake_best_time, fake_plan
 from app.contracts.models import (
@@ -35,9 +37,11 @@ async def best_time(body: BestTimeRequest, request: Request) -> BestTimeResponse
 
 
 @router.get("/routes/{trip_id}/options/{option_id}/waypoints", response_model=WaypointsResponse)
-async def get_waypoints(trip_id: UUID, option_id: str, language: str = "en-IN") -> WaypointsResponse:
+async def get_waypoints(
+    trip_id: UUID, option_id: str, language: str = "en-IN", at: datetime | None = None
+) -> WaypointsResponse:
     # Cues are English for now; P2's voice code translates them (language is accepted for later)
-    return await trip_waypoints(trip_id, option_id)
+    return await trip_waypoints(trip_id, option_id, as_ist(at) if at else None)
 
 
 @router.post("/routes/{trip_id}/choice", status_code=204)

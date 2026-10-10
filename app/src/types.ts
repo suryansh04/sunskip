@@ -7,6 +7,7 @@ export type PlaceInput = LatLng | { query: string };
 export type Shade = {
   status: "READY" | "PREPARING" | "UNAVAILABLE";
   jobId: string | null;
+  reason?: "OUTSIDE_INDIA" | "NO_DATA" | "BUDGET" | null;
   cellsTotal?: number | null;
   cellsDone?: number | null;
   pollAfterSeconds?: number | null;

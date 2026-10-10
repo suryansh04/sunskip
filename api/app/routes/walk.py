@@ -23,6 +23,8 @@ class WalkPath:
     length_m: float
     nodata_m: float
     sun: SunLookup
+    # Segments of the shortest OSM path: the closest match to Google's own line, used to count walkers
+    shortest_segment_ids: list[int]
 
 
 @dataclass
@@ -77,7 +79,8 @@ def nearest_node(corridor: Corridor, point: Point) -> int | None:
     return best
 
 
-def choose_nodes(graph: nx.Graph, start: int, end: int) -> list[int] | None:
+def choose_nodes(graph: nx.Graph, start: int, end: int) -> tuple[list[int], list[int]] | None:
+    """(the path to offer, the shortest path)."""
     try:
         shortest = nx.shortest_path(graph, start, end, weight="length")
         shadiest = nx.shortest_path(graph, start, end, weight="cost")
@@ -86,10 +89,14 @@ def choose_nodes(graph: nx.Graph, start: int, end: int) -> list[int] | None:
     shortest_m = nx.path_weight(graph, shortest, weight="length")
     shadiest_m = nx.path_weight(graph, shadiest, weight="length")
     # Take the shady path only if the detour is small enough
-    return shadiest if shadiest_m <= settings.max_detour_ratio * shortest_m else shortest
+    return (shadiest if shadiest_m <= settings.max_detour_ratio * shortest_m else shortest), shortest
 
 
-def to_walk_path(nodes: list[int], graph: nx.Graph, corridor: Corridor, hour: int) -> WalkPath:
+def path_segment_ids(nodes: list[int], graph: nx.Graph) -> list[int]:
+    return [graph[node_a][node_b]["segment_id"] for node_a, node_b in pairwise(nodes)]
+
+
+def to_walk_path(nodes: list[int], shortest: list[int], graph: nx.Graph, corridor: Corridor, hour: int) -> WalkPath:
     segment_ids, coords, pieces = [], [], []
     for node_a, node_b in pairwise(nodes):
         segment_id = graph[node_a][node_b]["segment_id"]
@@ -102,7 +109,9 @@ def to_walk_path(nodes: list[int], graph: nx.Graph, corridor: Corridor, hour: in
     nodata_m = sum(
         length for segment_id, length in pieces if corridor.sun.get((segment_id, hour), NO_SHADE_ROW)[1] >= 1
     )
-    return WalkPath(segment_ids, coords, pieces, sum(length for _, length in pieces), nodata_m, corridor.sun)
+    length_m = sum(length for _, length in pieces)
+    shortest_ids = path_segment_ids(shortest, graph)
+    return WalkPath(segment_ids, coords, pieces, length_m, nodata_m, corridor.sun, shortest_ids)
 
 
 async def find_shadiest_path(google_coords: list[Point], start_at: datetime, feels_like: dict) -> WalkPath | None:
@@ -112,7 +121,8 @@ async def find_shadiest_path(google_coords: list[Point], start_at: datetime, fee
     if start is None or end is None or start == end:
         return None
     graph = build_graph(corridor, start_hour.hour, heat_weight(feels_like.get(start_hour)))
-    nodes = await asyncio.to_thread(choose_nodes, graph, start, end)
-    if nodes is None:
+    chosen = await asyncio.to_thread(choose_nodes, graph, start, end)
+    if chosen is None:
         return None
-    return to_walk_path(nodes, graph, corridor, start_hour.hour)
+    nodes, shortest = chosen
+    return to_walk_path(nodes, shortest, graph, corridor, start_hour.hour)

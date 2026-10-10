@@ -72,7 +72,7 @@ Every error looks like `{ "error": { "code", "message", "requestId" } }`.
 | 429     | `RATE_LIMITED`    | Not used in v1 (reserved). Too many calls (`Retry-After` set)                                                           | Wait                       |
 | 502/504 | `UPSTREAM_ERROR`  | Google, Sarvam, Claude or Open-Meteo failed                                                                             | Use a fallback             |
 | 500/503 | `INTERNAL_ERROR`  | Our bug or DB down                                                                                                      | Retry once, then a banner  |
-| 501     | `NOT_IMPLEMENTED` | Agent and voice endpoints until P2's code is in                                                                         | Hide the feature           |
+| 501     | `NOT_IMPLEMENTED` | Agent and voice endpoints until P2's code is in                                                                         | Hide the feature (the app checks `/meta` `features`, so it never needs this) |
 
 **Student-app endpoints never fail because shade is missing.** They return results with a `shade` block and `null` sun fields instead.
 
@@ -105,9 +105,11 @@ Place       { name | null, location: LatLng }
 PlaceInput  { lat, lng } | { query }              // query is looked up by Google (India)
 
 Shade       { status: "READY" | "PREPARING" | "UNAVAILABLE", jobId | null,
+              reason: "OUTSIDE_INDIA" | "NO_DATA" | "BUDGET" | null,   // only when UNAVAILABLE
               cellsTotal?, cellsDone?, pollAfterSeconds? }
             // READY: shade data present · PREPARING: a job is running, poll it
-            // UNAVAILABLE: Google has no shade data here, our monthly budget is used up, or it's outside India
+            // UNAVAILABLE: it's outside India (OUTSIDE_INDIA), Google has no shade data here (NO_DATA), or
+            //   the monthly Solar budget or this device's daily allowance is used up (BUDGET)
 
 Exposure    { walkMeters, walkMinutes,
               sunMinutes | null,        // minutes walking in direct sun
@@ -215,12 +217,14 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
   "representativeDay": 15,
   "languages": ["en-IN", "hi-IN"],
   "modes": ["WALK", "BUS", "METRO", "RAIL", "ERICKSHAW"],
-  "heatAlertFeelsLikeC": 40
+  "heatAlertFeelsLikeC": 40,
+  "features": { "agent": false, "voice": false }
 }
 ```
 
 - `2025-04-19` is our real MUJ imagery date.
 - `shadeBudget.state` is `OK` or `EXHAUSTED`.
+- **`features`** says whether the agent (endpoint 9) and voice (10–12) are live (`AGENT_LIVE`, `VOICE_LIVE`). The app shows Ask SunSkip, the mic and spoken audio only when they are true. `/meta` is cached for an hour, so a change shows up within the hour.
 
 ### 2. `GET /shade/segments?bbox=w,s,e,n&month=5&hour=12`
 
@@ -326,6 +330,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - `departAt` defaults to now; `preference` defaults to 0.5.
+- **Arrive by:** send `arriveBy` instead of `departAt` (both is `400`). The API asks Google for transit that arrives by then, leaves as early as the longest trip needs, then checks the trips it would plan from that time and leaves earlier again (up to twice) by however late the latest one is. Every option arrives by `arriveBy`; some arrive earlier, because buses are not every minute.
 - **Send map/GPS points when you can.** In testing, the text "Manipal University Jaipur" was placed 20+ km away in Jaipur city.
 
 **Steps**
@@ -353,7 +358,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
    - A walk leg over 500 m, or with over 5 hot-sun minutes, whose two ends are both inside a drawn e-rickshaw zone (v1: MUJ area + Jaipur Pink Line station areas), gets an extra option.
    - Time = distance ÷ 4.2 m/s + 120 s wait. The fare comes from the zone, with the warning `FARE_ESTIMATED`.
    - A walk and its shadier copy turn into the same ride, so each ride is added once.
-6. **Rank, keep the best 6 (`MAX_OPTIONS`), label them and add warnings:**
+6. **Rank, keep the best 6 (`MAX_OPTIONS`), label them and add warnings.** While `shade.status` is `PREPARING`, some walks have no heat yet, so the options are ranked by time and fare only (`preference` counts as 0) and none is labelled `COOLEST`. Once the shade is in, the same request comes back ranked by heat.
+   Warnings:
    - `HEAT_ALERT` (feels-like ≥ 40 °C)
    - `LONG_WAIT_IN_SUN` (≥ 5 min)
    - `SHADE_PREPARING`
@@ -442,12 +448,12 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **Real:** 11.3 min at 1 PM and 7.6 min at 5 PM in May, as the API measures it today (the pilot CSV gave 7.4; PRD §8 explains the gap). The doses are examples: they assume a 5 min wait and feels-like 44 °C / 41 °C.
-- **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Waiting minutes stay the same for every slot.
+- **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Each stop's waiting minutes stay the same for every slot and count in the hour that ride boards.
 - **No shade data:** `basis: "TEMPERATURE_ONLY"`, `sunMinutes: null`. Slots are ranked by `walkMinutes × max(heatWeight, 0.1)` while the sun is ≥ 5° up. This is labelled as an estimate.
 
-### 7. `GET /routes/{tripId}/options/{optionId}/waypoints?language=en-IN`
+### 7. `GET /routes/{tripId}/options/{optionId}/waypoints?language=en-IN&at=`
 
-**Does:** gives the AR view a point every 25 m along the walk legs.
+**Does:** gives the AR view a point every 25 m along the walk legs, plus each walk leg's last point.
 
 ```json
 {
@@ -467,6 +473,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **`inSun`** is read from the Solar files at that point for the expected arrival time. It is `null` if shade is unknown; AR draws that part grey.
+- **`at`** (optional, ISO time) moves the whole trip to another start time, so `inSun` is shown for leaving then. The walk detail screen uses it for "Leave later" instead of planning the trip again.
+- **`distanceFromStartM`** is measured along the walking lines, starting at 0 on the first walk leg and running on across later walk legs (rides are not counted). The last point of each leg is included, so the last waypoint of a walk sits at its full length.
 - **`cue`** is English in v1; `language` is accepted for later (P2's voice code translates).
 - **`cue`** is set at the start of each leg and at turns of 30° or more.
 - **404** if the trip has expired.
@@ -542,6 +550,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Body:** `{ "tripId", "optionId", "language" }`.
 - **Returns:** `{ "steps": [ { "index": 0, "triggerAtMeters": 0, "text": "...", "audioUrl": "..." } ] }`.
+- **`triggerAtMeters`** uses the same scale as the waypoints' `distanceFromStartM` (endpoint 7): metres walked from the start of the first walk leg, across all walk legs. The app plays a step when the walker's nearest waypoint reaches it.
 - **How:** cues come from the waypoint cues plus shade notes ("next 100 m is shaded"). Max 30.
 - **Audio** is cached in S3 by sha256(text|language|voice). A failed step gets `audioUrl: null`.
 
@@ -648,7 +657,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **Real:** 0% shade, exposed 9 AM to 4 PM in May.
 - **How:**
   - Take the top 20 stretches.
-  - Trees: every 8 m along the stretch (6 m tall, 3 m crown; at most 50). Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
+  - Trees: every 8 m along the stretch (6 m tall, 3 m crown). A stretch that would need more than 50 (the simulator's limit) gets 50, spaced evenly over its whole length. Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
   - Simulate each (endpoint 16) and count only the sun saved on that stretch.
   - Pick the best by walkers × minutes saved ÷ cost.
 - Costs (₹3,000 per tree, ₹60,000 per shelter) are estimates. `reason` is a template, not an LLM.
@@ -814,6 +823,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | set at deploy (P2 adds them to `config.py` with the agent and voice code) |
 | `USE_FAKES`                                                                                          | false (true returns the pilot numbers)    |
 | `OUTSIDE_CALL_TIMEOUT_S`                                                                             | 10                                        |
+| `AGENT_LIVE`, `VOICE_LIVE` (shown in `/meta` `features`; P2 turns them on)                           | false, false                              |
 | `WALK_SPEED_MPS`                                                                                     | 1.2                                       |
 | `HEAT_ALERT_FEELS_LIKE_C`                                                                            | 40                                        |
 | `SHADE_ALPHA`, `MAX_DETOUR_RATIO`                                                                    | 3.0, 1.3                                  |

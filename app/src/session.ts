@@ -38,9 +38,10 @@ export function placeInput(place) {
   return place.lat === undefined ? { query: place.query } : { lat: place.lat, lng: place.lng };
 }
 
-// The body of POST /routes/plan
-export function planRequest(origin, destination, departAt) {
-  return { origin: placeInput(origin), destination: placeInput(destination), departAt, preference: PREFERENCE, allowErickshaw: true };
+// The body of POST /routes/plan: leave at `at`, or arrive by it
+export function planRequest(origin, destination, at, arrive = false) {
+  const when = arrive ? { arriveBy: at } : { departAt: at };
+  return { origin: placeInput(origin), destination: placeInput(destination), ...when, preference: PREFERENCE, allowErickshaw: true };
 }
 
 // The body of POST /routes/best-time: one slot an hour between two hours of a day
