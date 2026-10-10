@@ -7,6 +7,7 @@ import Results from "./pages/Results";
 import WalkDetail from "./pages/WalkDetail";
 import BestTime from "./pages/BestTime";
 import ShadeMap from "./pages/ShadeMap";
+import Navigate from "./pages/Navigate";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
@@ -17,6 +18,7 @@ createRoot(document.getElementById("root")).render(
         <Route path="/walk" element={<WalkDetail />} />
         <Route path="/best-time" element={<BestTime />} />
         <Route path="/map" element={<ShadeMap />} />
+        <Route path="/trip/:tripId/:optionId" element={<Navigate />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </div>
