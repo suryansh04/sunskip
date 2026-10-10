@@ -51,7 +51,8 @@ def set_coverage(leg: Leg, nodata_m: float) -> None:
 
 async def score_walk_leg(leg: Leg, feels_like: dict, prefer_cooler: bool) -> tuple[WalkSun, bool]:
     """Scores Google's walking line straight from the shade files (like the pilot walk). Returns the walk's sun,
-    and whether our own OSM path is shady enough to be worth offering as a cooler option."""
+    and whether our own OSM path is worth offering as another option: shadier, or clearly shorter (Google's
+    walking routes miss many campus and colony footpaths that OSM has)."""
     coords = [tuple(point) for point in leg.polyline["coordinates"]]
     if len(coords) < 2 or not await shade_fetched_along(coords):
         leg.shade_known, leg.coverage = False, "NONE"
@@ -68,7 +69,9 @@ async def score_walk_leg(leg: Leg, feels_like: dict, prefer_cooler: bool) -> tup
     cooler = bool(
         line_walk and path_walk and total_sun(path_walk) <= total_sun(line_walk) - settings.cooler_path_min_saving_min
     )
-    if path_walk and (line_walk is None or (prefer_cooler and cooler)):
+    shorter = bool(path_walk and path.length_m <= leg.distance_meters - settings.shorter_path_min_saving_m)
+    better = cooler or shorter
+    if path_walk and (line_walk is None or (prefer_cooler and better)):
         follow_path(leg, path)
         leg.segment_ids = path.segment_ids
         set_coverage(leg, path.nodata_m)
@@ -80,7 +83,7 @@ async def score_walk_leg(leg: Leg, feels_like: dict, prefer_cooler: bool) -> tup
         leg.shade_known, leg.coverage = False, "NONE"
         walk = unknown_walk_sun(leg.distance_meters, peak_feels_like(feels_like, leg.start_at, leg.end_at))
     leg.exposure = to_exposure([walk], None, feels_like)
-    return walk, cooler
+    return walk, better
 
 
 async def score_transit_leg(leg: Leg) -> tuple[float, datetime]:
@@ -117,7 +120,8 @@ async def build_option(
     shade: Shade,
     prefer_cooler: bool = False,
 ) -> tuple[RouteOption, bool]:
-    """Scores every leg. Returns the option and whether a cooler version (our own paths) is worth offering."""
+    """Scores every leg. Returns the option and whether a version on our own paths (shadier or shorter) is worth
+    offering."""
     walks, waits, has_cooler = [], [], False
     for leg in legs:
         if leg.mode == "WALK":
