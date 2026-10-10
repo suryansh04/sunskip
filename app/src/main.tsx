@@ -4,6 +4,9 @@ import "./index.css";
 import Home from "./pages/Home";
 import Search from "./pages/Search";
 import Results from "./pages/Results";
+import WalkDetail from "./pages/WalkDetail";
+import BestTime from "./pages/BestTime";
+import ShadeMap from "./pages/ShadeMap";
 
 createRoot(document.getElementById("root")).render(
   <BrowserRouter>
@@ -11,6 +14,9 @@ createRoot(document.getElementById("root")).render(
       <Routes>
         <Route path="/search" element={<Search />} />
         <Route path="/results/:optionId?" element={<Results />} />
+        <Route path="/walk" element={<WalkDetail />} />
+        <Route path="/best-time" element={<BestTime />} />
+        <Route path="/map" element={<ShadeMap />} />
         <Route path="*" element={<Home />} />
       </Routes>
     </div>

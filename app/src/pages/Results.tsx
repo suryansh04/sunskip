@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { boundsOf, optionLines } from "../geo";
 import { duration, errorMessage, istIso, now, shortTime, timeOf } from "../format";
-import { placeInput, recall } from "../session";
+import { planRequest, recall } from "../session";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
 import Sheet from "../components/Sheet";
@@ -17,7 +17,6 @@ import ShadeNotice from "../components/ShadeNotice";
 import StateMessage from "../components/StateMessage";
 import OptionDetail from "./OptionDetail";
 
-const PREFERENCE = 0.7; // 0 = cheap and fast, 1 = least sun (api.md §4)
 const START_ZOOM = 14.5;
 const STATE_ICON_PX = 30;
 
@@ -64,7 +63,7 @@ export default function Results() {
     }
     setLoading(true);
     setFailure(null);
-    const first = { origin: placeInput(search.origin), destination: placeInput(search.destination), departAt: search.at || istIso(now()), preference: PREFERENCE, allowErickshaw: true };
+    const first = planRequest(search.origin, search.destination, search.at || istIso(now()));
     const body = search.when === "arrive" ? leaveTimeFor(first) : Promise.resolve(first);
     body
       .then((final) => {

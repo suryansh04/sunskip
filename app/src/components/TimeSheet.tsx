@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { CalendarBlank } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import { atHour, dayLabel, fmt, hourLabel, hourOf, istIso, now } from "../format";
-import { placeInput } from "../session";
+import { bestTimeRequest } from "../session";
 import Sheet from "./Sheet";
 import Button from "./Button";
 import Segmented from "./Segmented";
@@ -33,14 +33,7 @@ export default function TimeSheet({ search, onPick, onClose }) {
   useEffect(() => {
     if (!search.destination || !search.origin) return;
     api
-      .post("/routes/best-time", {
-        origin: placeInput(search.origin),
-        destination: placeInput(search.destination),
-        date: dayIso.slice(0, 10),
-        from: `${String(FIRST_HOUR).padStart(2, "0")}:00`,
-        to: `${LAST_HOUR}:00`,
-        stepMinutes: 60,
-      })
+      .post("/routes/best-time", bestTimeRequest(search.origin, search.destination, dayIso, FIRST_HOUR, LAST_HOUR))
       .then((res) => setBest(res.data))
       .catch(() => setError("Can't load the sun minutes right now. You can still pick a time."))
       .finally(() => setLoading(false));

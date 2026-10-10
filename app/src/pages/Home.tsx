@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate } from "react-router";
 import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifold, ThermometerHot } from "@phosphor-icons/react";
 import { api } from "../api/client";
+import useShadeJob from "../api/useShadeJob";
 import { bboxAround, boxAround, sunnyShare } from "../geo";
 import { dayLabel, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
 import { addRecentPlace, MUJ_MAIN_GATE, NEW_SEARCH, recall, recentPlaces, remember } from "../session";
@@ -41,6 +42,9 @@ export default function Home() {
   const [sheetHeight, setSheetHeight] = useState(420);
   const [heatOpen, setHeatOpen] = useState(false);
   const [timeMode, setTimeMode] = useState("");
+  const [shadeAttempt, setShadeAttempt] = useState(0);
+  // Streets still being prepared show up by themselves when their shade job is done
+  useShadeJob(streets?.shade, () => setShadeAttempt(shadeAttempt + 1));
   const { origin, destination } = search;
 
   function update(change) {
@@ -66,18 +70,22 @@ export default function Home() {
 
   useEffect(() => {
     if (!origin) return;
-    setLoading(true);
-    setError("");
     api
       .get("/conditions", { params: { lat: origin.lat, lng: origin.lng, at: nowIso } })
       .then((res) => setConditions(res.data))
       .catch(() => setConditions(null));
+  }, [origin?.lat, origin?.lng]);
+
+  useEffect(() => {
+    if (!origin) return;
+    setLoading(true);
+    setError("");
     api
       .get("/shade/segments", { params: { bbox: bboxAround(origin), month: Number(nowIso.slice(5, 7)), hour: hourOf(nowIso) } })
       .then((res) => setStreets(res.data))
       .catch((err) => setError(errorMessage(err)))
       .finally(() => setLoading(false));
-  }, [origin?.lat, origin?.lng]);
+  }, [origin?.lat, origin?.lng, shadeAttempt]);
 
   function findRoutes(place) {
     if (!place) return navigate("/search");
