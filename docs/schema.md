@@ -578,7 +578,7 @@ FROM stops st LEFT JOIN stop_shade ss ON ss.stop_id = st.id AND ss.month = :mont
 WHERE st.id = :stop_id;
 ```
 
-**App trips per segment, last 30 days** (demand job):
+**App trips per segment, last 30 days** (demand job). A walk's segments are the OSM path it really takes: our shadier path when the option uses it, otherwise the shortest OSM path between its ends, the closest match to Google's line:
 
 ```sql
 SELECT seg_id, count(*) AS trips

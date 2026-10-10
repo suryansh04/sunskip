@@ -72,9 +72,10 @@ async def _request_routes(body: dict) -> list[dict]:
 
 
 async def compute_routes(
-    origin: PlaceInput, destination: PlaceInput, depart_at: datetime, travel_mode: str
+    origin: PlaceInput, destination: PlaceInput, depart_at: datetime, travel_mode: str, arrive: bool = False
 ) -> list[dict]:
-    cache_key = _cache_key(origin, destination, travel_mode, depart_at)
+    """With arrive=True (transit only), `depart_at` is the time to arrive by instead."""
+    cache_key = _cache_key(origin, destination, travel_mode + ("_ARRIVE" if arrive else ""), depart_at)
     cached = await read_routes_cache(cache_key)
     if cached is not None:
         return cached["routes"]
@@ -88,7 +89,9 @@ async def compute_routes(
     }
     if travel_mode == "TRANSIT":
         body["computeAlternativeRoutes"] = True
-        body["departureTime"] = depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        body["arrivalTime" if arrive else "departureTime"] = (
+            depart_at.astimezone(UTC).isoformat().replace("+00:00", "Z")
+        )
     routes = await _request_routes(body)
     if routes:  # "no route" isn't cached, so a fixed typo or a new bus line shows up straight away
         await write_routes_cache(cache_key, {"routes": routes})

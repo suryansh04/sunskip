@@ -27,6 +27,8 @@ class Settings(BaseSettings):
     api_pool_size: int = 10
     worker_pool_size: int = 3
     outside_call_timeout_s: float = 10
+    agent_live: bool = False  # P2 turns these on once /agent/chat and /voice/* answer for real; /meta tells the app
+    voice_live: bool = False
 
     # Walking and heat (api.md §11)
     walk_speed_mps: float = 1.2

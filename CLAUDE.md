@@ -46,7 +46,7 @@ sunskip_app/
 ├── CLAUDE.md
 ├── README.md              what it is, architecture, local setup
 ├── docs/                  PRD.md  TRD.md  api.md  schema.md  design.md  plans/
-├── .github/workflows/     ci.yml (ruff for api; add npm build jobs once app/ and portal/ exist)
+├── .github/workflows/     ci.yml (ruff for api, npm build for app; add a portal job once portal/ exists)
 ├── .gitignore
 │
 ├── api/                   FastAPI + worker (Python 3.12)
@@ -72,10 +72,11 @@ sunskip_app/
 │   └── .env.example
 │
 ├── app/                   student app (Vite + React, phone-first PWA)
+│   ├── README.md              how to run the app, mocks, phone testing
 │   ├── public/icon-512.png
 │   ├── src/
 │   │   ├── main.tsx  index.css  types.ts
-│   │   ├── api/               client.ts, fixtures/
+│   │   ├── api/               client.ts, fixtures/, walk.ts, useShadeJob.ts
 │   │   ├── components/        MapView, RouteCard, HeatBanner, ...
 │   │   ├── pages/             Home, Results, BestTime, ShadeMap
 │   │   └── features/          agent/ (P2), voice/ (P2), ar/ (P3)

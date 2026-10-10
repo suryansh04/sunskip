@@ -136,15 +136,20 @@ async def claim_cell(geohash: str) -> asyncpg.Record | None:
     )
 
 
-async def count_solar_call() -> int:
-    return await get_pool().fetchval(
+async def reserve_solar_call(budget: int) -> bool:
+    """Counts one Solar call, but only while the month is under budget (one statement, so two workers can't both
+    take the last call). False means the budget is used up and nothing was counted."""
+    calls = await get_pool().fetchval(
         f"""
         INSERT INTO solar_usage (month_start, calls)
         VALUES ({THIS_MONTH_IST}, 1)
         ON CONFLICT (month_start) DO UPDATE SET calls = solar_usage.calls + 1
+        WHERE solar_usage.calls < $1
         RETURNING calls
-        """
+        """,
+        budget,
     )
+    return calls is not None
 
 
 async def set_cell_status(geohash: str, status: str) -> None:

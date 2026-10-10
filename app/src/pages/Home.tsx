@@ -70,7 +70,7 @@ export default function Home() {
 
   useEffect(() => {
     if (!origin) locate();
-    isLive("/agent/chat").then(setAskLive);
+    isLive("agent").then(setAskLive);
   }, []);
 
   useEffect(() => {

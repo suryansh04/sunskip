@@ -63,12 +63,14 @@ async def score_walk_leg(leg: Leg, feels_like: dict, prefer_cooler: bool) -> tup
         path = None  # our path has no shade data at all, so it can't tell us anything
     line_walk = line_sun(line, leg.start_at, feels_like) if line else None
     path_walk = walk_sun(path, leg.start_at, feels_like) if path else None
-    leg.segment_ids = path.segment_ids if path else []
+    # Walker counts (portal demand) use the OSM segments the walk really takes
+    leg.segment_ids = path.shortest_segment_ids if path else []
     cooler = bool(
         line_walk and path_walk and total_sun(path_walk) <= total_sun(line_walk) - settings.cooler_path_min_saving_min
     )
     if path_walk and (line_walk is None or (prefer_cooler and cooler)):
         follow_path(leg, path)
+        leg.segment_ids = path.segment_ids
         set_coverage(leg, path.nodata_m)
         walk = path_walk
     elif line_walk:

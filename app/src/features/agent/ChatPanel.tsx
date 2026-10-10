@@ -27,7 +27,7 @@ export default function ChatPanel({ tripId, location, about, listen, onClose }) 
   const end = useRef(null);
 
   useEffect(() => {
-    isLive("/voice/stt").then(setMicLive);
+    isLive("voice").then(setMicLive);
   }, []);
 
   useEffect(() => {

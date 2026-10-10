@@ -35,6 +35,7 @@ export default function Navigate() {
   const navigate = useNavigate();
   const location = useLocation();
   const view = params.get("view") || "map";
+  const leaveAt = params.get("at"); // a later start picked on the walk screen: the sun is shown for then
   const [waypoints, setWaypoints] = useState(null);
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState(null);
@@ -53,7 +54,7 @@ export default function Navigate() {
     setLoading(true);
     setFailure(null);
     api
-      .get(`/routes/${tripId}/options/${optionId}/waypoints`)
+      .get(`/routes/${tripId}/options/${optionId}/waypoints`, { params: leaveAt ? { at: leaveAt } : {} })
       .then((res) => setWaypoints(res.data.waypoints))
       .catch((err) => setFailure({ expired: err.response?.status === 404, message: errorMessage(err) }))
       .finally(() => setLoading(false));
@@ -84,6 +85,7 @@ export default function Navigate() {
     const next: any = { view: nextView };
     if (params.has("leg")) next.leg = params.get("leg");
     if (params.has("desk")) next.desk = params.get("desk");
+    if (leaveAt) next.at = leaveAt;
     if (reason === "unavailable") next.camera = "off";
     setParams(next, { replace: true });
   }
@@ -175,7 +177,7 @@ export default function Navigate() {
               <span className="absolute -top-1 size-4 -translate-x-1/2 rounded-full bg-white shadow-[0_0_0_3px_var(--color-ink)]" style={{ left: `${(100 * at) / last}%` }} />
             </div>
             {arrived && nextLeg !== undefined && (
-              <Button className="mt-4" onClick={() => setParams({ leg: String(nextLeg) }, { replace: true })}>
+              <Button className="mt-4" onClick={() => setParams({ leg: String(nextLeg), ...(leaveAt ? { at: leaveAt } : {}) }, { replace: true })}>
                 Next walk of this trip
               </Button>
             )}

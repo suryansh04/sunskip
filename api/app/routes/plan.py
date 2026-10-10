@@ -1,7 +1,7 @@
 import asyncio
 import time
 import uuid
-from datetime import datetime
+from datetime import datetime, timedelta
 
 import httpx
 
@@ -12,7 +12,7 @@ from app.core.errors import ApiError
 from app.db.trip_queries import RequestLog, log_route_request, save_trip
 from app.routes.erickshaw import erickshaw_option
 from app.routes.google import compute_routes, google_departure_time
-from app.routes.legs import parse_route, route_fare_inr
+from app.routes.legs import duration_seconds, parse_route, route_fare_inr
 from app.routes.options import build_option
 from app.routes.ranking import rank_options
 from app.shade.queue import ensure_shade
@@ -20,6 +20,7 @@ from app.shade.queue import ensure_shade
 FAILED_STATUSES = {422: "NO_ROUTE_FOUND", 502: "UPSTREAM_ERROR"}
 WALK_ONLY_FARE_INR = 0
 MS_PER_SECOND = 1000
+ARRIVE_BY_TRIES = 2
 
 
 async def fetch_google_routes(request: PlanRequest, google_time: datetime) -> tuple[list[dict], list[dict]]:
@@ -63,12 +64,24 @@ async def erickshaw_options(
 ) -> list[RouteOption]:
     """E-rickshaw copies of the options. A walk and its cooler copy become the same ride, so each ride is kept once."""
     seen, swaps = set(), []
-    for option in options:
-        swap = await erickshaw_option(option, depart_at, feels_like, shade)
+    candidates = await asyncio.gather(*(erickshaw_option(option, depart_at, feels_like, shade) for option in options))
+    for swap in candidates:
         if swap and route_signature(swap.legs) not in seen:
             seen.add(route_signature(swap.legs))
             swaps.append(swap)
     return swaps
+
+
+async def route_options(
+    legs: list[Leg], fare: int | None, depart_at: datetime, feels_like: dict, shade: Shade
+) -> list[RouteOption]:
+    """The route as Google gave it, plus its cooler copy on our own paths when there is one."""
+    cooler_legs = [leg.model_copy(deep=True) for leg in legs]
+    option, has_cooler = await build_option(legs, fare, depart_at, feels_like, shade)
+    if not has_cooler:
+        return [option]
+    cooler, _ = await build_option(cooler_legs, fare, depart_at, feels_like, shade, prefer_cooler=True)
+    return [option, cooler]
 
 
 async def trip_conditions(legs: list[Leg], depart_at: datetime) -> tuple[TripConditions, dict]:
@@ -105,17 +118,12 @@ async def build_plan(request: PlanRequest, depart_at: datetime, client_hash: str
         raise ApiError(422, "NO_ROUTE_FOUND", "No route found. Try picking the places on the map")
     conditions, feels_like = await trip_conditions(routes[0][0], depart_at)
     shade = await check_shade(routes, client_hash)
-    options = []
-    for legs, fare in routes:
-        cooler_legs = [leg.model_copy(deep=True) for leg in legs]
-        option, has_cooler = await build_option(legs, fare, depart_at, feels_like, shade)
-        options.append(option)
-        if has_cooler:
-            cooler, _ = await build_option(cooler_legs, fare, depart_at, feels_like, shade, prefer_cooler=True)
-            options.append(cooler)
+    # Each route is scored on its own, so they run side by side (the plan has to answer within 3 s)
+    built = await asyncio.gather(*(route_options(legs, fare, depart_at, feels_like, shade) for legs, fare in routes))
+    options = [option for route in built for option in route]
     if request.allow_erickshaw:
         options += await erickshaw_options(options, depart_at, feels_like, shade)
-    ranked = rank_options(options, request.preference, settings.max_options)
+    ranked = rank_options(options, request.preference, settings.max_options, heat_known=shade.status != "PREPARING")
     return PlanResponse(trip_id=str(uuid.uuid4()), shade=shade, conditions=conditions, options=ranked)
 
 
@@ -182,9 +190,51 @@ async def log_failed_plan(request: PlanRequest, depart_at: datetime, client_hash
     )
 
 
+async def departure_for(request: PlanRequest) -> datetime:
+    """The leave time to plan from. For "arrive by", ask Google for trips that arrive by then and leave as early as
+    the longest of them needs, so every option shown arrives in time."""
+    if request.arrive_by is None:
+        return as_ist(request.depart_at)
+    if request.depart_at is not None:
+        raise ApiError(400, "INVALID_REQUEST", "Send departAt or arriveBy, not both")
+    arrive_by = as_ist(request.arrive_by)
+    google_time = google_departure_time(arrive_by)
+    transit, walk = await asyncio.gather(
+        compute_routes(request.origin, request.destination, google_time, "TRANSIT", arrive=True),
+        compute_routes(request.origin, request.destination, google_time, "WALK"),
+        return_exceptions=True,
+    )
+    for result in (transit, walk):
+        if isinstance(result, Exception) and not isinstance(result, httpx.HTTPError):
+            raise result
+    # A Google outage here just leaves that kind out; planning itself reports the outage
+    routes = [] if isinstance(transit, Exception) else transit
+    if not isinstance(walk, Exception):
+        routes += [route for route in walk if route.get("distanceMeters", 0) <= settings.walk_only_max_m]
+    longest_s = max((duration_seconds(route.get("duration")) for route in routes), default=0)
+    depart_at = arrive_by - timedelta(seconds=longest_s)
+    # Buses leaving then may not be the ones Google picked for the arrival time: check the trips we would
+    # actually plan and leave earlier by however late the latest one is
+    for _ in range(ARRIVE_BY_TRIES):
+        late = await latest_arrival(request, depart_at) - arrive_by
+        if late <= timedelta(0):
+            break
+        depart_at -= late
+    return depart_at
+
+
+async def latest_arrival(request: PlanRequest, depart_at: datetime) -> datetime:
+    google_time = google_departure_time(depart_at)
+    transit, walk = await fetch_google_routes(request, google_time)
+    arrivals = [
+        legs[-1].end_at for route in transit + walk if (legs := parse_route(route, depart_at, depart_at - google_time))
+    ]
+    return max(arrivals, default=depart_at)
+
+
 async def plan_trip(request: PlanRequest, client_hash: str) -> PlanResponse:
     started = time.monotonic()
-    depart_at = as_ist(request.depart_at)
+    depart_at = await departure_for(request)
     try:
         plan = await build_plan(request, depart_at, client_hash)
     except ApiError as error:

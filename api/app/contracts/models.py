@@ -45,6 +45,7 @@ class Place(ApiModel):
 
 class Shade(ApiModel):
     status: Literal["READY", "PREPARING", "UNAVAILABLE"]
+    reason: Literal["OUTSIDE_INDIA", "NO_DATA", "BUDGET"] | None = None  # only when UNAVAILABLE
     job_id: str | None = None
     cells_total: int | None = None
     cells_done: int | None = None
@@ -105,6 +106,7 @@ class PlanRequest(ApiModel):
     origin: PlaceInput
     destination: PlaceInput
     depart_at: datetime | None = None
+    arrive_by: datetime | None = None  # instead of departAt: plan so that every option arrives by then
     preference: float = Field(default=0.5, ge=0, le=1)
     allow_erickshaw: bool = True
 

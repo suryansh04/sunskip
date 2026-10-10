@@ -72,18 +72,19 @@ async def find_missing_work(cells: list[str], areas: list[str]) -> tuple[list[st
 async def ensure_shade(area: dict, buffer_m: float, reason: str, client_hash: str | None) -> Shade:
     """Checks shade data around `area` (GeoJSON). Queues a job for what's missing; never waits."""
     if not inside_india(area):
-        return Shade(status="UNAVAILABLE")  # v1 is India only: never spend Solar calls elsewhere
+        # v1 is India only: never spend Solar calls elsewhere
+        return Shade(status="UNAVAILABLE", reason="OUTSIDE_INDIA")
     cells, areas = await find_cells_and_areas(area, buffer_m)
     missing_cells, missing_areas, cell_statuses, active_job = await find_missing_work(cells, areas)
     if not missing_cells and not missing_areas:
         if active_job:
             return preparing(str(active_job["id"]), len(active_job["cells"]), active_job["cells_done"])
         if cells and all(cell_statuses[cell] == "NO_DATA" for cell in cells):
-            return Shade(status="UNAVAILABLE")
+            return Shade(status="UNAVAILABLE", reason="NO_DATA")
         return Shade(status="READY")
     allowed = await cells_allowed(client_hash)
     if missing_cells and not allowed:
-        return Shade(status="UNAVAILABLE")
+        return Shade(status="UNAVAILABLE", reason="BUDGET")
     new_cells = missing_cells[:allowed]
     job_id = await queue_job(reason, client_hash, new_cells, missing_areas)
     return preparing(job_id, len(new_cells), 0)
