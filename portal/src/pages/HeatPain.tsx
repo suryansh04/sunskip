@@ -4,7 +4,7 @@ import maplibregl from "maplibre-gl";
 import { ArrowsClockwise, DownloadSimple, HourglassMedium, MapTrifold, WifiSlash } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
-import { BANDS } from "../bands";
+import { BANDS, PAIN_COLOR } from "../bands";
 import { MONTHS, errorMessage, hourLabel, inr } from "../format";
 import { flyTo, midpoint, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
@@ -98,6 +98,8 @@ export default function HeatPain() {
     if (!map) return;
     showLayers(map, LAYERS);
     map.setFilter("stretches", null);
+    map.setPaintProperty("stretches", "line-color", PAIN_COLOR);
+    map.setPaintProperty("stretches", "line-opacity", 1);
     setSource(map, "stretches", rows.map((row) => ({ type: "Feature", properties: { id: row.stretchId, pain: row.painScore }, geometry: row.geometry })));
     tags.current = rows.slice(0, TAGGED).map((row) => {
       // MapLibre moves the marker with its transform, so the highlight goes on the inner label

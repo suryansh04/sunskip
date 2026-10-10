@@ -10,6 +10,7 @@ import HeatPain from "./pages/HeatPain";
 import Stretch from "./pages/Stretch";
 import Recommendations from "./pages/Recommendations";
 import Simulate from "./pages/Simulate";
+import Stats from "./pages/Stats";
 
 if (loginNeeded) signCallsIn(api);
 
@@ -29,6 +30,7 @@ createRoot(document.getElementById("root")).render(
         <Route path="/stretch/:stretchId" element={<Stretch />} />
         <Route path="/recommendations" element={<Recommendations />} />
         <Route path="/simulate" element={<Simulate />} />
+        <Route path="/stats" element={<Stats />} />
         <Route path="*" element={<HeatPain />} />
       </Route>
     </Routes>

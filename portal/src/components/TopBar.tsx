@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bus, CaretDown, Cube, Fire, SignOut, TrainSimple, Tree } from "@phosphor-icons/react";
+import { Bus, CaretDown, ChartBar, Cube, Fire, SignOut, TrainSimple, Tree } from "@phosphor-icons/react";
 import { AREAS } from "../areas";
 import { loginNeeded, logout, signedInEmail } from "../auth";
 
@@ -7,6 +7,7 @@ const TABS = [
   { key: "pain", label: "Heat pain", icon: Fire },
   { key: "recs", label: "Trees + shelters", icon: Tree },
   { key: "sim", label: "Simulator", icon: Cube },
+  { key: "stats", label: "Usage", icon: ChartBar },
 ];
 const AREA_ICON = { bus: Bus, train: TrainSimple };
 

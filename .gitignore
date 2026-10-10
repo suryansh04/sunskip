@@ -7,3 +7,4 @@ dist/
 api/.data/
 .env.local
 .env.*.local
+*.tsbuildinfo
