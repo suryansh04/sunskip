@@ -1,5 +1,5 @@
 import { Bus, CaretRight, Clock, FlagCheckered, PersonSimpleWalk, Taxi, TrainSimple } from "@phosphor-icons/react";
-import { duration, fmt, timeOf } from "../format";
+import { dayWord, duration, fmt, timeOf } from "../format";
 import { sunBit } from "../geo";
 import SunStrip from "./SunStrip";
 import LegRow from "./LegRow";
@@ -39,7 +39,7 @@ export default function LegsTimeline({ option, points, destinationName, onOpenWa
         const mode = MODE[leg.mode];
         const endName = leg.to.name || option.legs[i + 1]?.from.name || destinationName;
         const bits = points.filter((point) => point.legIndex === i).map((point) => sunBit(point.inSun));
-        const opensWalk = leg.mode === "WALK" && i === 0;
+        const opensWalk = leg.mode === "WALK" && i === 0 && onOpenWalk;
         const row = (
           <LegRow dot={{ Icon: mode.Icon, style: mode.dot }} rail={mode.rail} title={titleOf(leg, endName)} detail={detailOf(leg)}>
             {bits.length > 1 && <SunStrip bits={bits} className="mt-2 h-2" />}
@@ -68,7 +68,7 @@ export default function LegsTimeline({ option, points, destinationName, onOpenWa
         );
       })}
       <li>
-        <LegRow dot={{ Icon: FlagCheckered, style: "bg-ink text-white" }} rail="" title={destinationName} detail={`Arrive ${timeOf(option.arriveAt)}`} />
+        <LegRow dot={{ Icon: FlagCheckered, style: "bg-ink text-white" }} rail="" title={destinationName} detail={`Arrive ${timeOf(option.arriveAt)}${dayWord(option.arriveAt)}`} />
       </li>
     </ol>
   );

@@ -43,6 +43,15 @@ export function timeOf(iso) {
   return `${hour % 12 || 12}:${iso.slice(14, 16)} ${hour >= 12 ? "PM" : "AM"}`;
 }
 
+// "" today, " tomorrow", or " on Fri 15 May": added after a time so a plan for another day says so
+export function dayWord(iso) {
+  const today = istIso(now()).slice(0, 10);
+  const day = iso.slice(0, 10);
+  if (day === today) return "";
+  const tomorrow = istIso(new Date(Date.parse(`${today}T12:00:00+05:30`) + 24 * 60 * 60 * 1000)).slice(0, 10);
+  return day === tomorrow ? " tomorrow" : ` on ${dayLabel(iso)}`;
+}
+
 // Whole hours read as "1 PM", other times as "1:22 PM"
 export function shortTime(iso) {
   return iso.slice(14, 16) === "00" ? hourLabel(hourOf(iso)) : timeOf(iso);

@@ -13,6 +13,8 @@ import AheadCard from "../components/AheadCard";
 import ArrowBackup from "../components/ArrowBackup";
 import InstructionBanner from "../components/InstructionBanner";
 import StateMessage from "../components/StateMessage";
+import RideGuide from "../components/RideGuide";
+import { recall } from "../session";
 import SpokenDirections from "../features/voice/SpokenDirections";
 
 // three.js and LocAR load only when the AR view opens
@@ -97,6 +99,10 @@ export default function Navigate() {
   }
 
   const points = (waypoints || []).filter((point) => point.legIndex === legIndex);
+  const option = location.state?.option;
+  if (!loading && !failure && points.length < 2 && option) {
+    return <RideGuide option={option} destinationName={recall("search")?.destination?.name} onDone={endWalk} />;
+  }
   if (loading || failure || points.length < 2) {
     return (
       <main className="absolute inset-0 bg-paper pt-16">
