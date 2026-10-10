@@ -9,6 +9,7 @@ import Shell from "./pages/Shell";
 import HeatPain from "./pages/HeatPain";
 import Stretch from "./pages/Stretch";
 import Recommendations from "./pages/Recommendations";
+import Simulate from "./pages/Simulate";
 
 if (loginNeeded) signCallsIn(api);
 
@@ -27,6 +28,7 @@ createRoot(document.getElementById("root")).render(
       <Route element={<SignedIn />}>
         <Route path="/stretch/:stretchId" element={<Stretch />} />
         <Route path="/recommendations" element={<Recommendations />} />
+        <Route path="/simulate" element={<Simulate />} />
         <Route path="*" element={<HeatPain />} />
       </Route>
     </Routes>
