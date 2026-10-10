@@ -20,7 +20,6 @@ CELL_PRECISION = 7
 NO_DATA = -1
 SHADE = 0
 SUN = 1
-CACHED_TILES = 32  # ~5 MB each decoded, so about 160 MB at most
 
 # Google's files carry a harmless odd TIFF tag; GDAL warns about it on every open
 logging.getLogger("rasterio._env").setLevel(logging.ERROR)
@@ -42,7 +41,8 @@ def transformer_to(crs: str) -> Transformer:
     return Transformer.from_crs("EPSG:4326", crs, always_xy=True)
 
 
-@lru_cache(maxsize=CACHED_TILES)
+# Each decoded tile is ~5 MB. One long trip touches ~60 tiles, so a small cache would re-read them on every plan
+@lru_cache(maxsize=settings.shade_tiles_cached)
 def load_tile(geohash: str, month: int) -> tuple[np.ndarray, np.ndarray, Affine, str]:
     """(values, no-data mask, transform, crs) of one saved month file. Saved files never change, so caching is safe;
     decoding is the slow part (~25 ms), and neighbouring requests keep asking for the same tiles."""

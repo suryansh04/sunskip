@@ -26,6 +26,7 @@ class Settings(BaseSettings):
     use_fakes: bool = False
     api_pool_size: int = 10
     worker_pool_size: int = 3
+    shade_tiles_cached: int = 128  # decoded shade files kept in memory, ~5 MB each
     outside_call_timeout_s: float = 10
     agent_live: bool = False  # P2 turns these on once /agent/chat and /voice/* answer for real; /meta tells the app
     voice_live: bool = False
