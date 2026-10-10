@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifold, Microphone, ThermometerHot } from "@phosphor-icons/react";
 import { api } from "../api/client";
@@ -41,6 +41,7 @@ export default function Home() {
   const [params, setParams] = useSearchParams();
   const nowIso = istIso(now());
   const [search, setSearch] = useState(() => recall("search") || NEW_SEARCH);
+  const stopLocating = useRef(null);
   const [conditions, setConditions] = useState(undefined); // undefined while loading, null when it failed
   const [streets, setStreets] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -66,6 +67,7 @@ export default function Home() {
   // The first fix is often a rough Wi-Fi or cell guess. Keep listening and move the start as the
   // GPS settles, until it is close enough or time runs out.
   function locate() {
+    stopLocating.current?.();
     if (USE_MOCKS || !navigator.geolocation) return update({ origin: { ...MUJ_MAIN_GATE, mine: USE_MOCKS, fallback: !USE_MOCKS } });
     const smoother = createFixSmoother();
     let best = null;
@@ -81,16 +83,17 @@ export default function Home() {
         if (best.accuracyM <= LOCATE_GOOD_M) return finish();
         if (!shown || metersBetween(shown, best) > LOCATE_MOVE_M) show(best);
       },
-      () => {
-        if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false, fallback: true } });
-        finish();
-      },
+      finish,
     );
     const timer = setTimeout(finish, LOCATE_MAX_MS);
-    function finish() {
+    stopLocating.current = () => {
       clearTimeout(timer);
       stop();
-      if (best && best !== shown) show(best);
+    };
+    function finish() {
+      stopLocating.current();
+      if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false, fallback: true } });
+      else if (best !== shown) show(best);
     }
   }
 
@@ -100,6 +103,7 @@ export default function Home() {
     if (origin?.pinned) return;
     update({ origin: null });
     locate();
+    return () => stopLocating.current?.();
   }, []);
 
   useEffect(() => {
@@ -126,8 +130,14 @@ export default function Home() {
     update({ destination: place });
     addRecentPlace(place, nowIso);
     setFinding(true);
-    setTimeout(() => navigate("/results"), FIND_DOTS_MS);
   }
+
+  // Routes need the start: while it is still being found, the dots keep running until it is
+  useEffect(() => {
+    if (!finding || !origin) return;
+    const timer = setTimeout(() => navigate("/results"), FIND_DOTS_MS);
+    return () => clearTimeout(timer);
+  }, [finding, origin]);
 
   const share = streets ? sunnyShare(streets.features) : null;
   const shadeNote = loading

@@ -45,16 +45,21 @@ export default function Search() {
   useEffect(() => {
     setNearby([]);
     setLookFailed(false);
+    setLooking(false);
     if (typed.length < MIN_QUERY_LETTERS) return;
+    let current = true; // an answer for an older spelling is dropped
     setLooking(true);
     const timer = setTimeout(() => {
       api
         .get("/places", { params: { q: typed, lat: start.lat, lng: start.lng } })
-        .then((res) => setNearby(res.data.places.map(nearbyRow)))
-        .catch(() => setLookFailed(true))
-        .finally(() => setLooking(false));
+        .then((res) => current && setNearby(res.data.places.map(nearbyRow)))
+        .catch(() => current && setLookFailed(true))
+        .finally(() => current && setLooking(false));
     }, TYPE_PAUSE_MS);
-    return () => clearTimeout(timer);
+    return () => {
+      current = false;
+      clearTimeout(timer);
+    };
   }, [typed]);
 
   function save(change) {
