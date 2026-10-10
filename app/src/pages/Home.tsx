@@ -66,7 +66,7 @@ export default function Home() {
   // The first fix is often a rough Wi-Fi or cell guess. Keep listening and move the start as the
   // GPS settles, until it is close enough or time runs out.
   function locate() {
-    if (USE_MOCKS || !navigator.geolocation) return update({ origin: { ...MUJ_MAIN_GATE, mine: USE_MOCKS } });
+    if (USE_MOCKS || !navigator.geolocation) return update({ origin: { ...MUJ_MAIN_GATE, mine: USE_MOCKS, fallback: !USE_MOCKS } });
     const smoother = createFixSmoother();
     let best = null;
     let shown = null;
@@ -82,7 +82,7 @@ export default function Home() {
         if (!shown || metersBetween(shown, best) > LOCATE_MOVE_M) show(best);
       },
       () => {
-        if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false } });
+        if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false, fallback: true } });
         finish();
       },
     );
@@ -95,8 +95,11 @@ export default function Home() {
   }
 
   useEffect(() => {
-    if (!origin) locate();
     isLive("agent").then(setAskLive);
+    // Only a start picked on the map is kept; anything else is looked up again, since the walker may have moved
+    if (origin?.pinned) return;
+    update({ origin: null });
+    locate();
   }, []);
 
   useEffect(() => {

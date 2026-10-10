@@ -32,7 +32,7 @@ export default function Search() {
 
   function takePin() {
     if (picking === "from") {
-      save({ origin: { lat: pin.lat, lng: pin.lng, name: "the pinned start", mine: false } });
+      save({ origin: { lat: pin.lat, lng: pin.lng, name: "the pinned start", mine: false, pinned: true } });
       return setParams({}, { replace: true });
     }
     save({ destination: { name: "Pinned place", lat: pin.lat, lng: pin.lng } });
