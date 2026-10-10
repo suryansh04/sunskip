@@ -37,7 +37,7 @@ export default function Home() {
   const [params, setParams] = useSearchParams();
   const nowIso = istIso(now());
   const [search, setSearch] = useState(() => recall("search") || NEW_SEARCH);
-  const [conditions, setConditions] = useState(null);
+  const [conditions, setConditions] = useState(undefined); // undefined while loading, null when it failed
   const [streets, setStreets] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -104,7 +104,7 @@ export default function Home() {
   const shadeNote = loading
     ? "Checking the shade near you…"
     : error
-      ? "Can't load the shade map. Check your connection."
+      ? "Can't load the shade map"
       : share === null
         ? streets.shade.status === "PREPARING"
           ? "Preparing shade data near you…"
@@ -145,7 +145,7 @@ export default function Home() {
           </button>
         ) : (
           <span className="inline-flex min-h-10 items-center rounded-xl bg-white px-3.5 text-[15px] text-muted shadow-[0_2px_10px_rgba(40,25,10,.14)]">
-            {conditions ? "Feels-like temperature unknown" : "Checking the heat…"}
+            {conditions === undefined ? "Checking the heat…" : "Feels-like temperature unknown"}
           </span>
         )}
         <span className="flex-1" />
@@ -159,7 +159,12 @@ export default function Home() {
         style={{ bottom: sheetHeight + 12 }}
       >
         <span className="truncate">{shadeNote}</span>
-        <span className="flex gap-2.5 text-[13px] font-normal text-muted">
+        {error && (
+          <button type="button" onClick={() => setShadeAttempt(shadeAttempt + 1)} className="font-[650] text-shade-text">
+            Try again
+          </button>
+        )}
+        <span className={`gap-2.5 text-[13px] font-normal text-muted ${error ? "hidden" : "flex"}`}>
           <span>
             <i className="mr-[5px] inline-block h-[5px] w-3.5 rounded-[3px] bg-[#F5B47E] align-middle" />
             Sun

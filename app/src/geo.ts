@@ -59,8 +59,9 @@ export function sunBit(inSun) {
   return inSun === true ? "s" : inSun === false ? "d" : "u";
 }
 
+// The API's own distance along the walk, so the numbers add up the way its sun minutes do
 function pieceMeters(points, i) {
-  return metersBetween(points[i].location, points[i + 1].location);
+  return points[i + 1].distanceFromStartM - points[i].distanceFromStartM;
 }
 
 function line(coordinates, properties) {
