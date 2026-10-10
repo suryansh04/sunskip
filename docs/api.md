@@ -347,7 +347,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 3. **Walk legs with shade:**
    - Score Google's walking line directly: sample it every 5 m and read each point's sun bit from the Solar files, with the hour moving forward at 1.2 m/s. This is exactly how the pilot walk was measured.
    - Also search our own shadiest path: a small graph of the shade-ready OSM segments in the corridor, with cost `length × (1 + 3.0 × sun_fraction × heatWeight)` at the start hour, kept only if it's at most 1.3× the shortest path.
-   - If our path saves at least 1 sun minute (`COOLER_PATH_MIN_SAVING_MIN`), add a copy of the option that walks it instead.
+   - If our path saves at least 1 sun minute (`COOLER_PATH_MIN_SAVING_MIN`), or is at least 100 m shorter than Google's walk (`SHORTER_PATH_MIN_SAVING_M`; Google's walking routes miss many campus and colony footpaths that OSM has), add a copy of the option that walks it instead.
    - Then compute `Exposure`.
 4. **Transit legs:**
    - **Map Google's vehicle types:** `BUS` → BUS; `SUBWAY`, `METRO_RAIL`, `TRAM`, `MONORAIL` → METRO; `RAIL`, `HEAVY_RAIL`, `COMMUTER_TRAIN`, `HIGH_SPEED_TRAIN`, `LONG_DISTANCE_TRAIN` → RAIL; anything else → BUS.
@@ -837,6 +837,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`                                              | 6500, 4                                   |
 | `OVERPASS_URLS` (tried in order; the main server is often busy)                                      | overpass-api.de, then maps.mail.ru        |
 | `COOLER_PATH_MIN_SAVING_MIN`, `SOLAR_GEOTIFFS_PER_MINUTE`                                            | 1.0, 150                                  |
+| `SHORTER_PATH_MIN_SAVING_M`                                                                          | 100                                       |
 | `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600 (P2)                  |
 | `MAX_SHADE_MAP_KM2`, `POLL_AFTER_SECONDS`                                                            | 1, 3                                      |
 | `ORIGIN_SECRET_CHECK`                                                                                | true (false only locally)                 |

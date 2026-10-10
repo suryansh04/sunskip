@@ -37,6 +37,7 @@ class Settings(BaseSettings):
     shade_alpha: float = 3.0
     max_detour_ratio: float = 1.3
     cooler_path_min_saving_min: float = 1.0  # offer our own shadier path only if it saves this much sun
+    shorter_path_min_saving_m: float = 100  # ...or if it is at least this much shorter than Google's walk
     default_wait_seconds: int = 300
     long_wait_in_sun_min: float = 5
     walk_only_max_m: float = 3000
