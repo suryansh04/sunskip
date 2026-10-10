@@ -70,6 +70,12 @@ export function fareText(option, estimateWord) {
   return `₹${option.fareInr}` + (option.warnings.includes("FARE_ESTIMATED") ? estimateWord : "");
 }
 
+// "From your location · MUJ main gate", "From the pinned start"
+export function fromLine(origin) {
+  if (!origin) return "Finding your location…";
+  return origin.mine ? ["From your location", origin.name].filter(Boolean).join(" · ") : `From ${origin.name}`;
+}
+
 export function errorMessage(err) {
   return err.response?.data?.error?.message || "Something went wrong";
 }

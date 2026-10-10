@@ -3,18 +3,19 @@ import { useNavigate } from "react-router";
 import { CaretDown, ClockCounterClockwise, Crosshair, MagnifyingGlass, MapTrifold, ThermometerHot } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import { bboxAround, boxAround, sunnyShare } from "../geo";
-import { dayLabel, errorMessage, hourLabel, hourOf, istIso, now, timeOf } from "../format";
-import { addRecentPlace, recall, recentPlaces, remember } from "../session";
+import { dayLabel, errorMessage, fromLine, hourLabel, hourOf, istIso, now, timeOf } from "../format";
+import { addRecentPlace, MUJ_MAIN_GATE, NEW_SEARCH, recall, recentPlaces, remember } from "../session";
 import MapView from "../components/MapView";
 import Sheet from "../components/Sheet";
 import Button from "../components/Button";
 import RoundButton from "../components/RoundButton";
 import Segmented from "../components/Segmented";
+import HeatSheet from "../components/HeatSheet";
+import TimeSheet from "../components/TimeSheet";
 
-// Where the app starts when it can't use your location: the pilot walk's start (PRD §2)
-const MUJ_MAIN_GATE = { lat: 26.8440591, lng: 75.5651573, name: "MUJ main gate" };
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 const HOME_MAX_ZOOM = 15.6;
+const NEAR_YOU_M = 300; // how far around you the map shows at first
 const FIND_DOTS_MS = 400;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -31,13 +32,15 @@ function dayStart(iso) {
 export default function Home() {
   const navigate = useNavigate();
   const nowIso = istIso(now());
-  const [search, setSearch] = useState(() => recall("search") || { origin: null, destination: null, when: "now", at: null });
+  const [search, setSearch] = useState(() => recall("search") || NEW_SEARCH);
   const [conditions, setConditions] = useState(null);
   const [streets, setStreets] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [finding, setFinding] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(420);
+  const [heatOpen, setHeatOpen] = useState(false);
+  const [timeMode, setTimeMode] = useState("");
   const { origin, destination } = search;
 
   function update(change) {
@@ -99,14 +102,13 @@ export default function Home() {
     { value: "leave", label: search.when === "leave" && search.at ? `Leave ${hourLabel(hourOf(search.at))}` : "Leave at…" },
     { value: "arrive", label: search.when === "arrive" && search.at ? `Arrive ${hourLabel(hourOf(search.at))}` : "Arrive by…" },
   ];
-  const fromLine = !origin ? "Finding your location…" : origin.mine ? ["From your location", origin.name].filter(Boolean).join(" · ") : `From ${origin.name}`;
   const recents = recentPlaces();
   const center = origin || MUJ_MAIN_GATE;
 
   return (
     <main>
       <MapView
-        camera={{ bounds: boxAround(center), maxZoom: HOME_MAX_ZOOM }}
+        camera={{ bounds: boxAround(center, NEAR_YOU_M), maxZoom: HOME_MAX_ZOOM }}
         padding={{ top: 96, bottom: sheetHeight + 44, left: 40, right: 40 }}
         streets={streets}
         start={origin && [origin.lng, origin.lat]}
@@ -121,6 +123,7 @@ export default function Home() {
         {conditions?.feelsLikeC != null ? (
           <button
             type="button"
+            onClick={() => setHeatOpen(true)}
             className={`press inline-flex min-h-10 items-center gap-2 rounded-xl pr-3.5 pl-[11px] text-[15px] font-[650] shadow-[0_2px_10px_rgba(40,25,10,.14)] ${conditions.heatAlert ? "bg-alert text-white" : "bg-white text-ink"}`}
           >
             <ThermometerHot size={20} weight="bold" />
@@ -165,9 +168,9 @@ export default function Home() {
         </button>
         <p className="flex items-center gap-2.5 px-1 pt-2.5 text-[15px] text-muted">
           <i className="size-2.5 flex-none rounded-full shadow-[inset_0_0_0_2.5px_var(--color-ink)]" />
-          {fromLine}
+          {fromLine(origin)}
         </p>
-        <Segmented label="When to travel" className="mt-3.5" options={whenOptions} value={search.when} onChange={(when) => update({ when, at: null })} />
+        <Segmented label="When to travel" className="mt-3.5" options={whenOptions} value={search.when} onChange={(when) => (when === "now" ? update({ when, at: null }) : setTimeMode(when))} />
         <Button className="mt-3.5" onClick={() => findRoutes(destination)}>
           {finding ? (
             <span className="flex gap-1.5" aria-label="Finding routes">
@@ -208,6 +211,18 @@ export default function Home() {
           </button>
         </div>
       </Sheet>
+
+      {heatOpen && <HeatSheet place={origin} placeName={origin.name || "Your location"} at={nowIso} onClose={() => setHeatOpen(false)} />}
+      {timeMode && (
+        <TimeSheet
+          search={{ ...search, when: timeMode }}
+          onClose={() => setTimeMode("")}
+          onPick={(time) => {
+            update(time);
+            setTimeMode("");
+          }}
+        />
+      )}
     </main>
   );
 }

@@ -22,9 +22,9 @@ export function turnBetween(from, to) {
   return ((to - from + 540) % 360) - 180;
 }
 
-// [[west, south], [east, north]] of the 900 m box around a point
-export function boxAround(center) {
-  const lat = BOX_HALF_M / METERS_PER_DEG;
+// [[west, south], [east, north]] of the box that reaches halfM from a point
+export function boxAround(center, halfM = BOX_HALF_M) {
+  const lat = halfM / METERS_PER_DEG;
   const lng = lat / Math.cos((center.lat * Math.PI) / 180);
   return [
     [center.lng - lng, center.lat - lat],
