@@ -1,0 +1,179 @@
+@import "tailwindcss";
+
+/* Design tokens from docs/design.md §2, §3 and §8 */
+@theme {
+  --color-paper: #f4efe8;
+  --color-sheet: #ffffff;
+  --color-sunken: #f1ebe3;
+  --color-ink: #1f1a16;
+  --color-muted: #6b5f55;
+  --color-line: #e6ddd2;
+  --color-shade: #2f80ed;
+  --color-shade-text: #1a5fc4;
+  --color-shade-tint: #e4eefc;
+  --color-shade-strong: #1e6fd9;
+  --color-sun: #f2994a;
+  --color-sun-text: #9a4d0e;
+  --color-sun-tint: #fdebdb;
+  --color-alert: #b91c1c;
+  --color-alert-tint: #fbe6e3;
+  --color-unknown: #b9afa6;
+  --color-metro: #c2185b;
+
+  --font-sans: "Mona Sans", "Noto Sans Devanagari", system-ui, sans-serif;
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+
+  --animate-up: up 0.42s var(--ease-soft) both;
+  --animate-forward: forward 0.34s var(--ease-soft) both;
+  --animate-rise: rise 0.4s var(--ease-soft) both;
+  --animate-land: land 0.5s var(--ease-soft) 0.15s both;
+  --animate-fill: fill 0.3s var(--ease-soft) both;
+  --animate-grow: grow 0.5s var(--ease-soft) both;
+  --animate-fade: fade 0.25s ease-out both;
+  --animate-shimmer: shimmer 1.2s linear infinite;
+  --animate-dot: dot 0.9s ease-in-out infinite;
+  --animate-listen: listen 1.4s var(--ease-soft) infinite;
+  --animate-ar-open: ar-open 0.5s var(--ease-soft) both;
+
+  @keyframes up {
+    from {
+      transform: translateY(40px);
+      opacity: 0;
+    }
+  }
+  @keyframes forward {
+    from {
+      transform: translateX(28px);
+      opacity: 0;
+    }
+  }
+  @keyframes rise {
+    from {
+      transform: translateY(14px);
+      opacity: 0;
+    }
+  }
+  @keyframes land {
+    from {
+      transform: translateY(10px) scale(0.96);
+      opacity: 0;
+    }
+  }
+  @keyframes fill {
+    from {
+      transform: scaleY(0.2);
+      opacity: 0;
+    }
+  }
+  @keyframes grow {
+    from {
+      transform: scaleX(0);
+    }
+  }
+  @keyframes fade {
+    from {
+      opacity: 0;
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+  @keyframes dot {
+    0%,
+    100% {
+      opacity: 0.35;
+      transform: scale(0.8);
+    }
+    50% {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+  @keyframes listen {
+    from {
+      transform: scale(0.6);
+      opacity: 0.5;
+    }
+    to {
+      transform: scale(1.15);
+      opacity: 0;
+    }
+  }
+  /* The camera view opens as a circle growing out of the AR button */
+  @keyframes ar-open {
+    from {
+      clip-path: circle(0 at 62% 92%);
+    }
+    to {
+      clip-path: circle(150% at 62% 92%);
+    }
+  }
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    overflow: hidden;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-family: var(--font-sans);
+    font-size: 16px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    cursor: pointer;
+    text-align: left;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-shade);
+    outline-offset: 2px;
+  }
+  :lang(hi) {
+    line-height: 1.6;
+  }
+  @media (min-width: 600px) {
+    body {
+      background: #e4dcd1;
+    }
+  }
+}
+
+/* The wide 125% width is only for numbers */
+@utility wide {
+  font-stretch: 125%;
+}
+
+/* Every button presses in to 97% on touch (80 ms) and springs back (250 ms) */
+@utility press {
+  transition: transform 0.25s var(--ease-soft);
+  &:active {
+    transform: scale(0.97);
+    transition-duration: 0.08s;
+  }
+}
+
+/* Loading bars: grey with a slow shimmer */
+@utility shimmer {
+  background: linear-gradient(90deg, var(--color-sunken) 25%, #fbf7f2 50%, var(--color-sunken) 75%);
+  background-size: 200% 100%;
+  animation: var(--animate-shimmer);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation: none !important;
+    transition: none !important;
+  }
+}

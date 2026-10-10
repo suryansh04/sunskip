@@ -1,0 +1,37 @@
+[
+  {
+    "match": "5 baje|5 बजे|5 pm|at 5",
+    "reply": "हाँ। शाम 5 बजे निकलेंगे तो पैदल रास्ते में 15.3 मिनट धूप लगेगी। दोपहर 1 बजे 36.1 मिनट लगती है।",
+    "englishReply": "Yes. Leaving at 5 PM means 15.3 minutes of walking in direct sun, versus 36.1 at 1 PM.",
+    "toolsUsed": ["find_best_time"],
+    "fallback": false
+  },
+  {
+    "match": "6 बजे|6 baje|6 pm|at 6",
+    "reply": "शाम 6 बजे निकलेंगे तो पैदल रास्ते में 5.9 मिनट धूप लगेगी।",
+    "englishReply": "Leaving at 6 PM means 5.9 minutes of walking in direct sun.",
+    "toolsUsed": ["find_best_time"],
+    "fallback": false
+  },
+  {
+    "match": "least sun|kam dhoop|कम धूप",
+    "reply": "सबसे कम धूप ई-रिक्शा, बस 26, बस 9C और फिर ई-रिक्शा वाले रास्ते में है: पैदल धूप 0 मिनट। इसमें 2 घंटे 13 मिनट लगते हैं और किराया लगभग ₹85 है।",
+    "englishReply": "The route with an e-rickshaw, Bus 26, Bus 9C and another e-rickshaw has the least sun: 0 minutes of walking in direct sun. It takes 2 h 13 min and costs about ₹85.",
+    "toolsUsed": ["plan_route"],
+    "fallback": false
+  },
+  {
+    "match": "stop shaded|bus 26 stop|स्टॉप",
+    "reply": "नहीं। बस 26 के स्टॉप पर छाया नहीं है। वहाँ लगभग 5 मिनट धूप में इंतज़ार करना होगा।",
+    "englishReply": "No. The Bus 26 stop has no shade. The wait there is about 5 minutes in the sun.",
+    "toolsUsed": ["explain_segment"],
+    "fallback": false
+  },
+  {
+    "match": "",
+    "reply": "सुझाए गए रास्ते में 4.7 मिनट पैदल धूप है और 10 मिनट स्टॉप पर धूप में इंतज़ार है। इसमें 2 घंटे 1 मिनट लगते हैं।",
+    "englishReply": "The recommended route has 4.7 minutes of walking in direct sun and 10 minutes of waiting at stops in the sun. It takes 2 h 1 min.",
+    "toolsUsed": ["plan_route"],
+    "fallback": true
+  }
+]
