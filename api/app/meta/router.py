@@ -27,4 +27,5 @@ async def get_meta(response: Response) -> dict:
         "languages": LANGUAGES,
         "modes": MODES,
         "heatAlertFeelsLikeC": settings.heat_alert_feels_like_c,
+        "features": {"agent": settings.agent_live, "voice": settings.voice_live},
     }

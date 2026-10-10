@@ -2,10 +2,10 @@ import { useEffect, useRef, useState } from "react";
 import { useNavigate } from "react-router";
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
-import { planWalk } from "../api/walk";
+import { planWalk, walkPointsAt } from "../api/walk";
 import { bboxAround, sunnyShare, walkPieces } from "../geo";
 import { atHour, dayLabel, errorMessage, fmt, hourLabel, hourOf, istIso, now } from "../format";
-import { MUJ_MAIN_GATE, recall } from "../session";
+import { bestTimeRequest, MUJ_MAIN_GATE, recall } from "../session";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
 import Sheet from "../components/Sheet";
@@ -35,6 +35,8 @@ export default function ShadeMap() {
   const [hour, setHour] = useState(Math.min(Math.max(hourOf(nowIso), FIRST_HOUR), LAST_HOUR));
   const [streets, setStreets] = useState(null);
   const [walked, setWalked] = useState(null);
+  const [base, setBase] = useState(null);
+  const [walkSlots, setWalkSlots] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [attempt, setAttempt] = useState(0);
@@ -60,14 +62,27 @@ export default function ShadeMap() {
     };
   }, [hour, center.lat, center.lng, attempt]);
 
+  // The walk is planned once; each hour then reads the sun along it for that time (waypoints ?at=),
+  // and its minutes in sun per hour come from /routes/best-time
   useEffect(() => {
     if (!walk) return;
+    planWalk(walk, walk.at)
+      .then((planned) => planned.option && setBase(planned))
+      .catch(() => setBase(null));
+    api
+      .post("/routes/best-time", bestTimeRequest(walk.from, walk.to, walk.at, FIRST_HOUR, LAST_HOUR))
+      .then((res) => setWalkSlots(res.data.slots))
+      .catch(() => setWalkSlots([]));
+  }, []);
+
+  useEffect(() => {
+    if (!base) return;
     if (walks.current[hour]) return setWalked(walks.current[hour]);
     let current = true;
     const timer = setTimeout(() => {
-      planWalk(walk, atHour(walk.at, hour))
-        .then((planned) => {
-          walks.current[hour] = { ...planned, lines: walkPieces(planned.points) };
+      walkPointsAt(base, atHour(walk.at, hour))
+        .then((points) => {
+          walks.current[hour] = { lines: walkPieces(points) };
           if (current) setWalked(walks.current[hour]);
         })
         .catch(() => current && setWalked(null));
@@ -76,11 +91,12 @@ export default function ShadeMap() {
       current = false;
       clearTimeout(timer);
     };
-  }, [hour]);
+  }, [base, hour]);
 
   const share = streets ? sunnyShare(streets.features) : null;
   const preparing = streets?.shade.status === "PREPARING";
-  const walkSun = walked?.option?.exposure.sunMinutes;
+  const walkSlot = walkSlots.find((slot) => hourOf(slot.departAt) === hour);
+  const walkSun = walkSlot ? walkSlot.sunMinutes : undefined;
 
   return (
     <main>

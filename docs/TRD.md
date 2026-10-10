@@ -52,6 +52,7 @@ worker → Google Solar (shade), Overpass (OpenStreetMap)
 | Install as app | `vite-plugin-pwa@1` (app only)                                                                                                |
 | Icons          | `@phosphor-icons/react@2` (Bold weight; see design.md)                                                                        |
 | AR (P3 only)   | `locar@0.2.12` (exact) + `three@0.181.x`                                                                                      |
+| Phone testing  | `@vitejs/plugin-basic-ssl@2` (dev only: HTTPS for camera, GPS and compass on a phone)                                          |
 
 > **Why these versions:** newer majors exist (Vite 8, React Router 8, TypeScript 7), but they are new and less documented. Stay on the lines above. LocAR needs `three` 0.181.x exactly.
 
@@ -118,7 +119,7 @@ api.interceptors.request.use((config) => {
   if (token) config.headers["Authorization"] = "Bearer " + token;
   if (import.meta.env.VITE_USE_MOCKS === "true") {
     config.adapter = async () => ({
-      data: fixtures(config),
+      data: await fixtures(config), // fixtures may wait or fail, to show loading and error states
       status: 200,
       statusText: "OK",
       headers: {},
@@ -211,7 +212,7 @@ sunskip/                    (repo root)
   api/                      FastAPI + worker (§5.2)
   app/                      student app (below)
   portal/                   officials portal (below)
-  .github/workflows/        CI: ruff for api on every push to main and every pull request; add npm build jobs for app and portal when they exist
+  .github/workflows/        CI on every push to main and every pull request: ruff for api, `npm ci && npm run build` for app; add the portal job when it exists
   .gitignore
 ```
 
@@ -317,6 +318,7 @@ export default defineConfig({
     "lib": ["ES2022", "DOM", "DOM.Iterable"],
     "module": "ESNext",
     "moduleResolution": "bundler",
+    "allowImportingTsExtensions": true,
     "jsx": "react-jsx",
     "strict": false,
     "noImplicitAny": false,
@@ -328,6 +330,8 @@ export default defineConfig({
   "include": ["src"]
 }
 ```
+
+`allowImportingTsExtensions` is there because the AR folder imports its files with `.ts` endings.
 
 **`src/index.css`:** `@import "tailwindcss";` (Tailwind v4 needs no config file).
 
@@ -735,6 +739,7 @@ Start them again with `start-instances` and `start-db-instance`; the containers 
 | app, portal | `VITE_API_BASE_URL`                             | `/v1` locally (Vite forwards it); `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1` on Amplify |
 | app, portal | `VITE_USE_MOCKS`                                | `true` locally until the API is up                                                                    |
 | app, portal | `VITE_MAP_STYLE_URL`                            | `https://tiles.openfreemap.org/styles/positron`                                                       |
+| app         | `VITE_DEMO_NOW` (optional)                      | The time the app treats as "now", e.g. `2026-05-15T13:00:00+05:30` for the May demo; unset = real time; mocks default to 15 May 1 PM |
 | portal      | `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID` | from Cognito                                                                                          |
 | api         | settings list                                   | `api.md` §11 and `schema.md` §8                                                                       |
 

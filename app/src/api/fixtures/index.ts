@@ -68,8 +68,8 @@ async function shadeJob(jobId) {
   };
 }
 
-async function waypoints(config, tripId, optionId) {
-  if (tripId.startsWith("mock-walk-")) return (await read("walk-waypoints"))[tripId.slice("mock-walk-".length)];
+async function waypoints(config, tripId, optionId, at) {
+  if (tripId.startsWith("mock-walk-")) return (await read("walk-waypoints"))[at ? hourOf(at) : tripId.slice("mock-walk-".length)];
   const byOption = await read(tripId === "mock-trip" ? "waypoints" : "waypoints-noshade");
   if (!byOption[optionId]) throw fail(config, 404, "NOT_FOUND", "Unknown trip or option");
   return byOption[optionId];
@@ -133,7 +133,7 @@ export default async function fixtures(config) {
   if (path === "/shade/segments") return shadeSegments(params, state);
   if (path.startsWith("/shade/jobs/")) return shadeJob(path.split("/").pop());
   if (path === "/routes/best-time") return bestTime(body, state);
-  if (tripPath && method === "GET") return waypoints(config, tripPath[1], tripPath[2]);
+  if (tripPath && method === "GET") return waypoints(config, tripPath[1], tripPath[2], params.at);
   if (tripPath) return "";
   if (path === "/voice/instructions") return read("voice-instructions");
   if (path === "/voice/tts") return { audioUrl: null, cached: false };

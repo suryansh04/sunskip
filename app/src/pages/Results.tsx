@@ -29,15 +29,13 @@ function failureOf(err) {
   return { kind: "other", message: errorMessage(err) };
 }
 
-// The API plans from a leave time. For "arrive by", plan once to learn how long the trip takes,
-// then leave that much earlier.
-function leaveTimeFor(body) {
-  return api.post("/routes/plan", body).then((res) => {
-    if (!res.data.options.length) return body;
-    const tripMs = res.data.options[0].durationSeconds * 1000;
-    return { ...body, departAt: istIso(new Date(Date.parse(body.departAt) - tripMs)) };
-  });
-}
+// Why there is no shade data, in the words of the "No shade data" notice (api.md §4 Shade.reason)
+const NO_SHADE_TEXT = {
+  OUTSIDE_INDIA: "SunSkip has shade data only in India, so minutes in sun are unknown here.",
+  NO_DATA: "Google has no shade data for this area, so minutes in sun are unknown.",
+  BUDGET: "SunSkip can't fetch shade for new areas right now, so minutes in sun are unknown.",
+};
+const NO_SHADE_FALLBACK = "There is no shade data for this area, so minutes in sun are unknown.";
 
 // Route options (screens 06 to 09 and 23 to 25), and one option's detail at /results/:optionId
 export default function Results() {
@@ -68,20 +66,17 @@ export default function Results() {
     }
     setLoading(true);
     setFailure(null);
-    const first = planRequest(search.origin, search.destination, search.at || istIso(now()));
-    const body = search.when === "arrive" ? leaveTimeFor(first) : Promise.resolve(first);
-    body
-      .then((final) => {
-        setRequest(final);
-        return api.post("/routes/plan", final);
-      })
+    const body = planRequest(search.origin, search.destination, search.at || istIso(now()), search.when === "arrive");
+    setRequest(body);
+    api
+      .post("/routes/plan", body)
       .then((res) => (res.data.options.length ? setPlan(res.data) : setFailure({ kind: "noroute", message: "" })))
       .catch((err) => setFailure(failureOf(err)))
       .finally(() => setLoading(false));
   }, [attempt]);
 
   useEffect(() => {
-    isLive("/agent/chat").then(setAskLive);
+    isLive("agent").then(setAskLive);
   }, []);
 
   useEffect(() => {
@@ -117,7 +112,8 @@ export default function Results() {
   const preparing = plan?.shade.status === "PREPARING" && !gaveUp;
   const cellsDone = progress?.cellsDone ?? plan?.shade.cellsDone;
   const cellsTotal = progress?.cellsTotal ?? plan?.shade.cellsTotal;
-  const departAt = request?.departAt || istIso(now());
+  // For "arrive by" the API picks the leave time; every option leaves then
+  const departAt = plan?.options[0]?.departAt || request?.departAt || istIso(now());
   const whenText = search.when === "arrive" ? `arrive by ${shortTime(search.at)}` : search.when === "leave" ? `leave at ${shortTime(search.at)}` : `leave now, ${shortTime(departAt)}`;
   const detail = optionId && shown?.optionId === optionId && !loading && !failure;
   const tripCoords = shown ? shown.legs.flatMap((leg) => leg.polyline.coordinates) : [];
@@ -218,7 +214,7 @@ export default function Results() {
                 <ShadeNotice
                   icon={<CloudSlash size={20} weight="bold" />}
                   title="No shade data here"
-                  text="There is no shade data for this area, so minutes in sun are unknown. Times, fares and the best time to leave (from the sun's angle and the temperature) still work."
+                  text={`${NO_SHADE_TEXT[plan.shade.reason] || NO_SHADE_FALLBACK} Times, fares and the best time to leave (from the sun's angle and the temperature) still work.`}
                 />
               )}
               <div className="mx-5 mt-[18px] mb-0.5 flex items-baseline justify-between">
