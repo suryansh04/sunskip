@@ -1,0 +1,8 @@
+[
+  { "name": "Mansarovar Metro Station", "area": "Pink Line, Mansarovar, Jaipur", "kind": "metro", "lat": 26.8796046, "lng": 75.750682 },
+  { "name": "Mansarovar", "area": "Area in Jaipur", "kind": "place", "query": "Mansarovar, Jaipur" },
+  { "name": "Bus 26 stop, Dehmi Kalan", "area": "Manipal University Jaipur", "kind": "bus", "lat": 26.8389404, "lng": 75.5653743 },
+  { "name": "Civil Lines Metro Station", "area": "Pink Line, Civil Lines, Jaipur", "kind": "metro", "lat": 26.909675, "lng": 75.781563 },
+  { "name": "Sindhi Camp Metro Station", "area": "Pink Line, Station Road, Jaipur", "kind": "metro", "query": "Sindhi Camp Metro Station, Jaipur" },
+  { "name": "Chandpole Metro Station", "area": "Pink Line, Chandpole, Jaipur", "kind": "metro", "query": "Chandpole Metro Station, Jaipur" }
+]
