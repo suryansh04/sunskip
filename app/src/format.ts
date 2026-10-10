@@ -82,6 +82,7 @@ export function fareText(option, estimateWord) {
 // "From your location · MUJ main gate", "From the pinned start"
 export function fromLine(origin) {
   if (!origin) return "Finding your location…";
+  if (origin.fallback) return `Can't find your location · from ${origin.name}`;
   return origin.mine ? ["From your location", origin.name].filter(Boolean).join(" · ") : `From ${origin.name}`;
 }
 

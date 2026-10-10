@@ -14,6 +14,7 @@ import ArrowBackup from "../components/ArrowBackup";
 import InstructionBanner from "../components/InstructionBanner";
 import StateMessage from "../components/StateMessage";
 import RideGuide from "../components/RideGuide";
+import useReroute from "../api/useReroute";
 import { recall } from "../session";
 import SpokenDirections from "../features/voice/SpokenDirections";
 import { createFixSmoother, watchGps } from "../features/ar/gps";
@@ -57,7 +58,12 @@ export default function Navigate() {
 
   const walkLegs = [...new Set((waypoints || []).map((point) => point.legIndex))];
   const legIndex = params.has("leg") ? Number(params.get("leg")) : walkLegs[0];
-  const legKey = `${waypoints?.length}/${legIndex}`;
+  const planKey = `${waypoints?.length}/${legIndex}`;
+  const planned = (waypoints || []).filter((point) => point.legIndex === legIndex);
+  const { reroute, rerouting } = useReroute(fix, snap, planned[planned.length - 1]?.location, planKey);
+  // After a wrong turn the new walk from where the walker is replaces this leg
+  const points = reroute ? reroute.points : planned;
+  const legKey = reroute ? reroute.tripId : planKey;
 
   useEffect(() => {
     setLoading(true);
@@ -84,7 +90,7 @@ export default function Navigate() {
   }, []);
 
   useEffect(() => {
-    setRoute(buildRoute((waypoints || []).filter((point) => point.legIndex === legIndex)));
+    setRoute(buildRoute(points));
     setSnap(null);
   }, [legKey]);
 
@@ -94,12 +100,11 @@ export default function Navigate() {
   }, [route, fix]);
 
   useEffect(() => {
-    const leg = (waypoints || []).filter((point) => point.legIndex === legIndex);
-    setLines(leg.length > 1 ? walkPieces(leg) : null);
-    if (leg.length < 2) return;
+    setLines(points.length > 1 ? walkPieces(points) : null);
+    if (points.length < 2) return;
     const nowIso = istIso(now());
     api
-      .get("/shade/segments", { params: { bbox: bboxAround(leg[Math.floor(leg.length / 2)].location), month: Number(nowIso.slice(5, 7)), hour: hourOf(nowIso) } })
+      .get("/shade/segments", { params: { bbox: bboxAround(points[Math.floor(points.length / 2)].location), month: Number(nowIso.slice(5, 7)), hour: hourOf(nowIso) } })
       .then((res) => setStreets(res.data))
       .catch(() => setStreets(null));
   }, [legKey]);
@@ -119,7 +124,6 @@ export default function Navigate() {
     else navigate(-1);
   }
 
-  const points = (waypoints || []).filter((point) => point.legIndex === legIndex);
   const option = location.state?.option;
   if (!loading && !failure && points.length < 2 && option) {
     return <RideGuide option={option} destinationName={recall("search")?.destination?.name} onDone={endWalk} />;
@@ -162,11 +166,15 @@ export default function Navigate() {
   const youBearing = snap && route ? bearingAt(route, snap.progressM) : here.bearingDeg;
   const gpsNote = gpsOff
     ? "Location is off, so your place on the walk isn't shown"
-    : fix && fix.accuracyM > WEAK_GPS_M
-      ? `GPS is weak here (±${Math.round(fix.accuracyM)} m)`
-      : snap && !onPath
-        ? `You're ${Math.round(snap.offsetM)} m from the path`
-        : "";
+    : rerouting
+      ? "You left the path. Finding a new way from here…"
+      : !fix && !USE_MOCKS
+        ? "Finding your location…"
+        : fix && fix.accuracyM > WEAK_GPS_M
+          ? `GPS is weak here (±${Math.round(fix.accuracyM)} m)`
+          : snap && !onPath
+            ? `You're ${Math.round(snap.offsetM)} m from the path`
+            : "";
   const instruction = nextInstruction(points, at);
   const ahead = stretchAhead(points, at);
   const minutesToGo = Math.round(metersLeft(points, at) / WALK_SPEED_MPS / 60);
@@ -186,7 +194,7 @@ export default function Navigate() {
             lines={lines}
             start={null}
             end={[end.lng, end.lat]}
-            you={{ at: [youAt.lng, youAt.lat], bearing: youBearing }}
+            you={snap || USE_MOCKS ? { at: [youAt.lng, youAt.lat], bearing: youBearing } : null}
             creditBottom={sheetHeight + 6}
             onMoved={null}
           />
@@ -252,8 +260,8 @@ export default function Navigate() {
       {view !== "ar" && <InstructionBanner instruction={instruction} arrived={arrived} voiceOn={voiceOn} onToggleVoice={() => setVoiceOn(!voiceOn)} />}
       <SpokenDirections
         key={legKey}
-        tripId={tripId}
-        optionId={optionId}
+        tripId={reroute?.tripId || tripId}
+        optionId={reroute?.optionId || optionId}
         points={points}
         at={at}
         muted={!voiceOn}
