@@ -73,7 +73,7 @@ sunskip_app/
 │
 ├── app/                   student app (Vite + React, phone-first PWA)
 │   ├── README.md              how to run the app, mocks, phone testing
-│   ├── public/icon-512.png
+│   ├── public/                favicon.svg (logo master), favicon.ico, app icons
 │   ├── src/
 │   │   ├── main.tsx  index.css  types.ts
 │   │   ├── api/               client.ts, fixtures/, walk.ts, useShadeJob.ts

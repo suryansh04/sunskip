@@ -296,7 +296,11 @@ export default defineConfig({
         background_color: "#ffffff",
         display: "standalone",
         start_url: "/",
-        icons: [{ src: "/icon-512.png", sizes: "512x512", type: "image/png" }],
+        icons: [
+          { src: "/icon-192.png", sizes: "192x192", type: "image/png" },
+          { src: "/icon-512.png", sizes: "512x512", type: "image/png" },
+          { src: "/maskable-512.png", sizes: "512x512", type: "image/png", purpose: "maskable" },
+        ],
       },
     }),
   ],
@@ -304,7 +308,7 @@ export default defineConfig({
 });
 ```
 
-- The build makes `sw.js` and `manifest.webmanifest` (tested). Put `icon-512.png` in `public/`.
+- The build makes `sw.js` and `manifest.webmanifest` (tested). `public/` holds the logo: `favicon.svg` (the master: a map pin split into a sun-orange half and a shade-blue half), `favicon.ico`, `apple-touch-icon.png`, `icon-192.png`, `icon-512.png` and `maskable-512.png`. The portal copies `favicon.svg` and `favicon.ico`.
 - **Portal config:** the same without `VitePWA`, and with `port: 5174`.
 - **Local API calls:** set `VITE_API_BASE_URL=/v1`. Vite forwards `/v1` to the local api, so the browser sees one origin and needs no CORS (tested).
 - Both front ends can run at once (5173 and 5174).
