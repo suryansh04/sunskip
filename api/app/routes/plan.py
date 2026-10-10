@@ -62,11 +62,12 @@ def unique_routes(routes: list[tuple[list[Leg], int | None]]) -> list[tuple[list
 async def erickshaw_options(
     options: list[RouteOption], depart_at: datetime, feels_like: dict, shade: Shade
 ) -> list[RouteOption]:
-    """E-rickshaw copies of the options. A walk and its cooler copy become the same ride, so each ride is kept once."""
+    """E-rickshaw copies of the options. A walk and its copy on our paths become the same ride, so each ride is kept
+    once: the shortest one."""
     seen, swaps = set(), []
     candidates = await asyncio.gather(*(erickshaw_option(option, depart_at, feels_like, shade) for option in options))
-    for swap in candidates:
-        if swap and route_signature(swap.legs) not in seen:
+    for swap in sorted((swap for swap in candidates if swap), key=lambda swap: swap.duration_seconds):
+        if route_signature(swap.legs) not in seen:
             seen.add(route_signature(swap.legs))
             swaps.append(swap)
     return swaps
