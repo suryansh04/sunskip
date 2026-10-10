@@ -29,9 +29,9 @@ export default function Shell() {
   }
 
   return (
-    <div className="grid h-full grid-rows-[56px_1fr]">
+    <div className="grid h-full grid-rows-[56px_1fr] print:block">
       <TopBar tab={tabOf(location)} onTab={(tab) => navigate(TAB_PATHS[tab])} area={area} onArea={pickArea} />
-      <main className="relative grid min-h-0 grid-cols-[1fr_560px]">
+      <main className="relative grid min-h-0 grid-cols-[1fr_560px] print:block">
         <div className={fullPage ? "hidden" : "relative min-w-0"}>
           <MapView center={area.center} zoom={START_ZOOM} onReady={setMap} />
         </div>

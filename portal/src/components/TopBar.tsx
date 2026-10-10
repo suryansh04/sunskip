@@ -22,7 +22,7 @@ export default function TopBar({ tab, onTab, area, onArea }) {
   }
 
   return (
-    <header className="relative z-10 flex items-stretch bg-ink text-white">
+    <header className="relative z-10 flex items-stretch bg-ink text-white print:hidden">
       <div className="cond flex items-center gap-2.5 border-r border-barline pr-6.5 pl-6 text-[23px]">
         <img src="/favicon.svg" alt="" className="size-6" />
         SunSkip
