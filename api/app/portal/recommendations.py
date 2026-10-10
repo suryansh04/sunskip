@@ -9,7 +9,7 @@ from app.config import settings
 from app.contracts.ids import stretch_code
 from app.contracts.models import MAX_SIMULATED_ITEMS, LatLng, SimulatedItem
 from app.core.formulas import round_whole
-from app.core.geo import Point, haversine_m, sample_line
+from app.core.geo import Point, haversine_m, line_length_m, sample_line
 from app.db.portal_queries import load_stops_near_stretches, load_stretch_segments
 from app.portal.reports import ready_pain_rows
 from app.portal.simulate import SegmentResult, minutes_saved_per_day, simulate
@@ -28,7 +28,11 @@ def spread_out(points: list[Point], spacing_m: float) -> list[Point]:
 
 
 def tree_items(segment_lines: list[list[Point]]) -> list[SimulatedItem]:
-    points = [point for line in segment_lines for point in sample_line(line, settings.tree_spacing_m)]
+    """A tree every TREE_SPACING_M along the stretch. A stretch too long for 50 trees (the simulator's limit)
+    gets them spaced further apart, so the whole stretch is still covered."""
+    length_m = sum(line_length_m(line) for line in segment_lines)
+    spacing_m = max(settings.tree_spacing_m, length_m / MAX_SIMULATED_ITEMS)
+    points = [point for line in segment_lines for point in sample_line(line, spacing_m)]
     return [
         SimulatedItem(
             type="TREE",
@@ -36,7 +40,7 @@ def tree_items(segment_lines: list[list[Point]]) -> list[SimulatedItem]:
             height_m=settings.tree_height_m,
             crown_radius_m=settings.tree_crown_radius_m,
         )
-        for point in spread_out(points, settings.tree_spacing_m)[:MAX_SIMULATED_ITEMS]
+        for point in spread_out(points, spacing_m)[:MAX_SIMULATED_ITEMS]
     ]
 
 

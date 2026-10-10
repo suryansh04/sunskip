@@ -13,9 +13,9 @@ from app.core.storage import save_file
 from app.db.shade_queries import (
     claim_cell,
     count_cell_done,
-    count_solar_call,
     mark_cell_ready,
     record_cell_failure,
+    reserve_solar_call,
     set_cell_status,
 )
 
@@ -100,7 +100,7 @@ async def save_cell_files(geohash: str, layers: dict) -> None:
 
 async def download_cell(geohash: str, lat: float, lng: float) -> bool:
     """Fetches one cell. Returns True when Google has no data there."""
-    if await count_solar_call() > settings.solar_monthly_call_budget:
+    if not await reserve_solar_call(settings.solar_monthly_call_budget):
         await set_cell_status(geohash, "BUDGET_EXCEEDED")
         return False
     layers = await get_data_layers(lat, lng)

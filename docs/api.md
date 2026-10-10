@@ -448,7 +448,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **Real:** 11.3 min at 1 PM and 7.6 min at 5 PM in May, as the API measures it today (the pilot CSV gave 7.4; PRD §8 explains the gap). The doses are examples: they assume a 5 min wait and feels-like 44 °C / 41 °C.
-- **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Waiting minutes stay the same for every slot.
+- **How it works:** plan once (ranked by time and fare, so it's Google's own route), then re-score that option's walking lines for each slot (step 15, 30 or 60 min; max 14 h). No extra Google calls. Each stop's waiting minutes stay the same for every slot and count in the hour that ride boards.
 - **No shade data:** `basis: "TEMPERATURE_ONLY"`, `sunMinutes: null`. Slots are ranked by `walkMinutes × max(heatWeight, 0.1)` while the sun is ≥ 5° up. This is labelled as an estimate.
 
 ### 7. `GET /routes/{tripId}/options/{optionId}/waypoints?language=en-IN&at=`
@@ -657,7 +657,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **Real:** 0% shade, exposed 9 AM to 4 PM in May.
 - **How:**
   - Take the top 20 stretches.
-  - Trees: every 8 m along the stretch (6 m tall, 3 m crown; at most 50). Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
+  - Trees: every 8 m along the stretch (6 m tall, 3 m crown). A stretch that would need more than 50 (the simulator's limit) gets 50, spaced evenly over its whole length. Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
   - Simulate each (endpoint 16) and count only the sun saved on that stretch.
   - Pick the best by walkers × minutes saved ÷ cost.
 - Costs (₹3,000 per tree, ₹60,000 per shelter) are estimates. `reason` is a template, not an LLM.

@@ -14,6 +14,7 @@ from app.shade.tiles import NO_DATA, SUN, sun_bits
 
 COMPASS = ["north", "north-east", "east", "south-east", "south", "south-west", "west", "north-west"]
 TURN_DEG = 30
+END_GAP_M = 1.0  # a leg's end closer than this to the last sample adds no point (its bearing would be noise)
 COMPASS_STEP_DEG = FULL_TURN_DEG / len(COMPASS)
 
 
@@ -58,7 +59,7 @@ def leg_points(coords: list[tuple[float, float]]) -> tuple[list[tuple[float, flo
     """A point every few metres along the leg, always ending at its last point, and how far along each one is."""
     points = sample_line(coords, settings.waypoint_spacing_m)
     along_m = [index * settings.waypoint_spacing_m for index in range(len(points))]
-    if haversine_m(points[-1], coords[-1]) > 0:
+    if haversine_m(points[-1], coords[-1]) >= END_GAP_M:
         points.append(coords[-1])
         along_m.append(line_length_m(coords))
     return points, along_m

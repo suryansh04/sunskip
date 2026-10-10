@@ -17,6 +17,7 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
   }, []);
 
   function start() {
+    if (!navigator.mediaDevices || !window.MediaRecorder) return onError("This browser can't record. Type your question instead.");
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
