@@ -76,28 +76,33 @@ export default function Navigate() {
   }, [tripId, optionId, attempt]);
 
   useEffect(() => {
-    if (USE_MOCKS || !navigator.geolocation) return;
+    if (USE_MOCKS) return;
     const smoother = createFixSmoother();
+    let found = false;
     return watchGps(
       (raw) => {
+        found = true;
         setGpsOff(false);
         const smoothed = smoother.push(raw);
         if (smoothed) setFix(smoothed);
       },
-      // A timeout while standing still is normal: keep the last fix
-      (failure) => setGpsOff(failure === "denied" || failure === "unsupported"),
+      // A timeout while standing still is normal, and so is a lost signal once we had one: keep the last fix
+      (failure) => setGpsOff(failure === "denied" || failure === "unsupported" || (failure === "unavailable" && !found)),
     );
   }, []);
 
+  // The route and the snap carry the key of the walk they belong to, so a new walk never meets the old one's progress
   useEffect(() => {
-    setRoute(buildRoute(points));
-    setSnap(null);
+    setRoute({ key: legKey, path: buildRoute(points) });
   }, [legKey]);
 
   // Snap near where the walker last was, so a path that doubles back doesn't jump ahead
   useEffect(() => {
-    if (route && fix) setSnap((last) => snapToRoute(route, fix, last?.progressM ?? null));
+    if (!route?.path || !fix) return;
+    setSnap((last) => ({ key: route.key, ...snapToRoute(route.path, fix, last?.key === route.key ? last.progressM : null) }));
   }, [route, fix]);
+  const path = route?.key === legKey ? route.path : null;
+  const snapped = path && snap?.key === legKey ? snap : null;
 
   useEffect(() => {
     setLines(points.length > 1 ? walkPieces(points) : null);
@@ -158,12 +163,12 @@ export default function Navigate() {
   }
 
   const last = points.length - 1;
-  const at = USE_MOCKS ? Math.min(Number(params.get("step") ?? MOCK_STEP), last) : snap && route ? waypointAt(route, snap.progressM) : 0;
+  const at = USE_MOCKS ? Math.min(Number(params.get("step") ?? MOCK_STEP), last) : snapped ? waypointAt(path, snapped.progressM) : 0;
   const arrived = at === last;
   const here = points[at];
-  const onPath = snap && snap.offsetM <= SNAP_MAX_OFFSET_M;
-  const youAt = !snap ? here.location : onPath ? snap.point : fix;
-  const youBearing = snap && route ? bearingAt(route, snap.progressM) : here.bearingDeg;
+  const onPath = snapped && snapped.offsetM <= SNAP_MAX_OFFSET_M;
+  const youAt = !snapped ? here.location : onPath ? snapped.point : fix;
+  const youBearing = snapped ? bearingAt(path, snapped.progressM) : here.bearingDeg;
   const gpsNote = gpsOff
     ? "Location is off, so your place on the walk isn't shown"
     : rerouting
@@ -172,8 +177,8 @@ export default function Navigate() {
         ? "Finding your location…"
         : fix && fix.accuracyM > WEAK_GPS_M
           ? `GPS is weak here (±${Math.round(fix.accuracyM)} m)`
-          : snap && !onPath
-            ? `You're ${Math.round(snap.offsetM)} m from the path`
+          : snapped && !onPath
+            ? `You're ${Math.round(snapped.offsetM)} m from the path`
             : "";
   const instruction = nextInstruction(points, at);
   const ahead = stretchAhead(points, at);
@@ -194,7 +199,7 @@ export default function Navigate() {
             lines={lines}
             start={null}
             end={[end.lng, end.lat]}
-            you={snap || USE_MOCKS ? { at: [youAt.lng, youAt.lat], bearing: youBearing } : null}
+            you={snapped || USE_MOCKS ? { at: [youAt.lng, youAt.lat], bearing: youBearing } : null}
             creditBottom={sheetHeight + 6}
             onMoved={null}
           />

@@ -1,0 +1,101 @@
+[
+ {
+  "name": "G2 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8406751,
+   "lng": 75.5627091
+  },
+  "distanceM": 447
+ },
+ {
+  "name": "G3 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8405018,
+   "lng": 75.5629086
+  },
+  "distanceM": 453
+ },
+ {
+  "name": "G4 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8405206,
+   "lng": 75.5622397
+  },
+  "distanceM": 488
+ },
+ {
+  "name": "B1 Block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8418442,
+   "lng": 75.5628885
+  },
+  "distanceM": 333
+ },
+ {
+  "name": "B2 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8421523,
+   "lng": 75.5624735
+  },
+  "distanceM": 340
+ },
+ {
+  "name": "B6 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8422292,
+   "lng": 75.5618891
+  },
+  "distanceM": 383
+ },
+ {
+  "name": "B3 Block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.841538,
+   "lng": 75.5624763
+  },
+  "distanceM": 386
+ },
+ {
+  "name": "B5 block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8418084,
+   "lng": 75.5619673
+  },
+  "distanceM": 403
+ },
+ {
+  "name": "B7 Boy's Block",
+  "kind": "HOSTEL",
+  "location": {
+   "lat": 26.8419368,
+   "lng": 75.5611498
+  },
+  "distanceM": 463
+ },
+ {
+  "name": "Bus stop",
+  "kind": "BUS",
+  "location": {
+   "lat": 26.8388331,
+   "lng": 75.5652894
+  },
+  "distanceM": 579
+ },
+ {
+  "name": "IPS BUSINESS SCHOOL",
+  "kind": "ACADEMIC",
+  "location": {
+   "lat": 26.8807805,
+   "lng": 75.7552726
+  },
+  "distanceM": 19326
+ }
+]

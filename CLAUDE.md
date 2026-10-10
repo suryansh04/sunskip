@@ -8,7 +8,7 @@ The docs in `docs/` are a **reference, not a contract to follow line by line** (
 
 - `docs/PRD.md`: what we build and why
 - `docs/TRD.md`: stack, allowed packages, code rules, setup, deploy
-- `docs/api.md`: the 18 endpoints, data shapes, formulas
+- `docs/api.md`: the 19 endpoints, data shapes, formulas
 - `docs/schema.md`: every table and the `0001_init` SQL
 - `docs/design.md`: colours, font, icons, map style and every app screen
 - `README.md`: what SunSkip is, how it's built, and how to set it up locally
@@ -60,7 +60,7 @@ sunskip_app/
 │   │   ├── conditions/        router.py, report.py, weather.py, air.py
 │   │   ├── shade/             router.py, queue.py, segments.py, tiles.py, bbox.py
 │   │   ├── routes/            router.py, plan.py, google.py, legs.py, options.py, walk.py, exposure.py, ranking.py,
-│   │   │                      erickshaw.py, best_time.py, waypoints.py
+│   │   │                      erickshaw.py, best_time.py, waypoints.py, places.py
 │   │   ├── portal/            router.py, reports.py, recommendations.py, simulate.py
 │   │   ├── health/            router.py
 │   │   ├── agent/             router.py, ...           (P2)

@@ -1,7 +1,7 @@
 from datetime import datetime
 from uuid import UUID
 
-from fastapi import APIRouter, Request, Response
+from fastapi import APIRouter, Query, Request, Response
 
 from app.conditions.report import as_ist
 from app.config import settings
@@ -10,12 +10,14 @@ from app.contracts.models import (
     BestTimeRequest,
     BestTimeResponse,
     ChoiceRequest,
+    PlacesResponse,
     PlanRequest,
     PlanResponse,
     WaypointsResponse,
 )
 from app.db.trip_queries import save_choice
 from app.routes.best_time import find_best_time
+from app.routes.places import search_places
 from app.routes.plan import plan_trip, stored_option
 from app.routes.waypoints import load_option, trip_waypoints
 
@@ -49,3 +51,12 @@ async def record_choice(trip_id: UUID, body: ChoiceRequest) -> Response:
     option = await load_option(trip_id, body.option_id)
     await save_choice(trip_id, stored_option(option))
     return Response(status_code=204)
+
+
+@router.get("/places", response_model=PlacesResponse)
+async def find_places(
+    q: str = Query(min_length=2, max_length=100),
+    lat: float = Query(ge=-90, le=90),
+    lng: float = Query(ge=-180, le=180),
+) -> PlacesResponse:
+    return await search_places(q, lat, lng)

@@ -30,7 +30,7 @@ export const GPS_JUMPS_TO_ACCEPT = 3
 export const GPS_WORST_ACCURACY_M = 100
 /** How long to wait for a fix before reporting a timeout. */
 export const GPS_TIMEOUT_MS = 15000
-/** Ignore smoothed moves shorter than this. */
+/** Ignore smoothed moves (and accuracy changes) smaller than this. */
 export const GPS_MIN_MOVE_M = 1
 /** GPS accuracy worse than this, for this long, swaps the 3D arrows for the 2D compass arrow. */
 export const GPS_GATE_ACCURACY_M = 15
