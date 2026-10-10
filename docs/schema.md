@@ -228,6 +228,7 @@ DELETE FROM conditions_cache    WHERE expires_at < now() - interval '1 day';    
 | `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`, `OVERPASS_URLS`     | 6500, 4, public Overpass | worker     |
 | `SHADE_SAMPLE_SPACING_M`                                                     | 5                        | api, worker |
 | `API_POOL_SIZE`, `WORKER_POOL_SIZE`                                          | 10, 3                    | api, worker |
+| `SHADE_TILES_CACHED` (decoded shade files kept in memory, ~5 MB each)        | 128                      | api, worker |
 | `HEARTBEAT_INTERVAL_S`, `WORKER_IDLE_SLEEP_S`, `CLEANUP_INTERVAL_S`          | 30, 2, 600               | worker, api |
 
 ---
