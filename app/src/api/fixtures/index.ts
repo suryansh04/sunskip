@@ -34,6 +34,14 @@ function hourOf(isoTime) {
   return Math.min(Math.max(hour, SHADE_HOURS.first), SHADE_HOURS.last);
 }
 
+// The API also reads "GHS" and "BHS" as the girls' and boys' hostel blocks (G3 block, B1 Block)
+function nearbyName(name, typed) {
+  const wanted = typed.trim().toLowerCase();
+  if ("ghs".startsWith(wanted) && /^G\s?\d/.test(name)) return true;
+  if ("bhs".startsWith(wanted) && /^B\s?\d/.test(name)) return true;
+  return name.toLowerCase().includes(wanted);
+}
+
 function isBus26Stop(place) {
   if (place.query) return /bus 26/i.test(place.query);
   return Math.abs(place.lat - BUS_26_STOP.lat) < 0.0005 && Math.abs(place.lng - BUS_26_STOP.lng) < 0.0005;
@@ -129,6 +137,7 @@ export default async function fixtures(config) {
   if (path === "/agent/chat") return chat(body);
   await wait(DELAY_MS.other);
   if (path === "/meta") return read("meta");
+  if (path === "/places") return { places: (await read("places-nearby")).filter((place) => nearbyName(place.name, params.q)) };
   if (path === "/conditions") return read(params.at?.slice(11, 13) === "07" ? "conditions-day" : "conditions");
   if (path === "/shade/segments") return shadeSegments(params, state);
   if (path.startsWith("/shade/jobs/")) return shadeJob(path.split("/").pop());

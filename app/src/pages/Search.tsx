@@ -1,7 +1,8 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
 import { ArrowLeft, Bus, MagnifyingGlass, MapPin, TrainSimple, XCircle } from "@phosphor-icons/react";
 import places from "../api/fixtures/places.json";
+import { api } from "../api/client";
 import { fromLine } from "../format";
 import { MUJ_MAIN_GATE, NEW_SEARCH, recall, remember } from "../session";
 import MapView from "../components/MapView";
@@ -12,9 +13,21 @@ import Button from "../components/Button";
 const PICK_ZOOM = 16;
 const MIN_QUERY_LETTERS = 2; // the API looks up names of 2 letters or more
 const KIND_ICON = { metro: TrainSimple, bus: Bus, place: MapPin, typed: MagnifyingGlass };
+const TYPE_PAUSE_MS = 250; // look names up once typing pauses
+const KIND_WORD = { HOSTEL: "Hostel", ACADEMIC: "College or school", CAMPUS_GATE: "Campus gate", FOOD: "Food", SHOP: "Shop", OTHER: "Place", BUS: "Bus stop", METRO: "Metro station" };
 
-// Destination search (screen 03). The API has no autocomplete, so the list is the demo places,
-// whatever was typed (looked up by name), or a point picked on the map.
+function distanceWord(meters) {
+  return meters < 1000 ? `${meters} m away` : `${(meters / 1000).toFixed(1)} km away`;
+}
+
+// A place from GET /places as a row of the list
+function nearbyRow(place) {
+  const kind = place.kind === "BUS" ? "bus" : place.kind === "METRO" ? "metro" : "place";
+  return { name: place.name, area: `${KIND_WORD[place.kind] || "Place"} · ${distanceWord(place.distanceM)}`, kind, ...place.location };
+}
+
+// Destination search (screen 03): places near the start whose name matches (GET /places, from OSM),
+// the demo places, whatever was typed (looked up by name), or a point picked on the map.
 export default function Search() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -23,6 +36,26 @@ export default function Search() {
   const picking = params.get("pick");
   const start = search.origin || MUJ_MAIN_GATE;
   const [pin, setPin] = useState(start);
+  const [nearby, setNearby] = useState([]);
+  const [looking, setLooking] = useState(false);
+  const [lookFailed, setLookFailed] = useState(false);
+  const typed = query.trim();
+
+  // Names of hostels, gates, stops and shops near the start, from OSM (GET /places)
+  useEffect(() => {
+    setNearby([]);
+    setLookFailed(false);
+    if (typed.length < MIN_QUERY_LETTERS) return;
+    setLooking(true);
+    const timer = setTimeout(() => {
+      api
+        .get("/places", { params: { q: typed, lat: start.lat, lng: start.lng } })
+        .then((res) => setNearby(res.data.places.map(nearbyRow)))
+        .catch(() => setLookFailed(true))
+        .finally(() => setLooking(false));
+    }, TYPE_PAUSE_MS);
+    return () => clearTimeout(timer);
+  }, [typed]);
 
   function save(change) {
     const next = { ...search, ...change };
@@ -62,11 +95,11 @@ export default function Search() {
     );
   }
 
-  const typed = query.trim();
   const wanted = typed.toLowerCase();
-  const matches = places.filter((place) => !wanted || place.name.toLowerCase().includes(wanted) || place.area.toLowerCase().includes(wanted));
+  const builtIn = places.filter((place) => !wanted || place.name.toLowerCase().includes(wanted) || place.area.toLowerCase().includes(wanted));
+  const matches = [...nearby, ...builtIn.filter((place) => !nearby.some((row) => row.name === place.name))];
   const exact = matches.some((place) => place.name.toLowerCase() === wanted);
-  const rows = typed.length >= MIN_QUERY_LETTERS && !exact ? [{ name: typed, area: "Look this name up", kind: "typed", query: typed }, ...matches] : matches;
+  const rows = typed.length >= MIN_QUERY_LETTERS && !exact ? [...matches, { name: typed, area: "Look this name up", kind: "typed", query: typed }] : matches;
 
   function choose({ area, kind, ...place }) {
     save({ destination: place });
@@ -125,6 +158,8 @@ export default function Search() {
             </li>
           );
         })}
+        {looking && <li className="border-line px-4 py-3 text-[14px] text-muted not-first:border-t">Looking for places near you…</li>}
+        {lookFailed && <li className="border-line px-4 py-3 text-[14px] text-muted not-first:border-t">Can't search places near you right now.</li>}
         {rows.length === 0 && <li className="p-4 text-[15px] text-muted">No places match. Type one more letter to look the name up, or pick the place on the map.</li>}
       </ul>
 
