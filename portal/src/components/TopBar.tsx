@@ -1,10 +1,11 @@
 import { useState } from "react";
-import { Bus, CaretDown, Fire, SignOut, TrainSimple } from "@phosphor-icons/react";
+import { Bus, CaretDown, Fire, SignOut, TrainSimple, Tree } from "@phosphor-icons/react";
 import { AREAS } from "../areas";
 import { loginNeeded, logout, signedInEmail } from "../auth";
 
 const TABS = [
   { key: "pain", label: "Heat pain", icon: Fire },
+  { key: "recs", label: "Trees + shelters", icon: Tree },
 ];
 const AREA_ICON = { bus: Bus, train: TrainSimple };
 

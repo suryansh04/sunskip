@@ -8,6 +8,7 @@ import Callback from "./pages/Callback";
 import Shell from "./pages/Shell";
 import HeatPain from "./pages/HeatPain";
 import Stretch from "./pages/Stretch";
+import Recommendations from "./pages/Recommendations";
 
 if (loginNeeded) signCallsIn(api);
 
@@ -25,6 +26,7 @@ createRoot(document.getElementById("root")).render(
       <Route path="/callback" element={<Callback />} />
       <Route element={<SignedIn />}>
         <Route path="/stretch/:stretchId" element={<Stretch />} />
+        <Route path="/recommendations" element={<Recommendations />} />
         <Route path="*" element={<HeatPain />} />
       </Route>
     </Routes>
