@@ -12,6 +12,7 @@ const STREET_UNKNOWN = "#CFC6BD";
 const RIDE = "#3A302A";
 const SUNNY_FROM = 0.5;
 const MOVE_MS = 700;
+const FIT_MAX_ZOOM = 17;
 const NO_LINES = { type: "FeatureCollection", features: [] };
 const ROUND = { "line-cap": "round", "line-join": "round" };
 
@@ -115,9 +116,14 @@ export default function MapView({ camera, padding, streets, streetOpacity = 1, l
     if (!ready) return;
     const map = mapRef.current;
     const still = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-    const move = { padding, duration: still ? 0 : MOVE_MS };
-    if (camera.bounds) map.fitBounds(camera.bounds, { ...move, maxZoom: camera.maxZoom, pitch: 0, bearing: 0 });
-    else map.easeTo({ ...move, center: camera.center, zoom: camera.zoom, pitch: camera.pitch || 0, bearing: camera.bearing || 0 });
+    const duration = still ? 0 : MOVE_MS;
+    if (camera.bounds) {
+      map.fitBounds(camera.bounds, { padding, duration, maxZoom: camera.maxZoom || FIT_MAX_ZOOM, pitch: 0, bearing: 0 });
+      return;
+    }
+    // An offset, not easeTo's padding: that one stays on the map and would be added to the next fitBounds
+    const offset: [number, number] = [(padding.left - padding.right) / 2, (padding.top - padding.bottom) / 2];
+    map.easeTo({ center: camera.center, zoom: camera.zoom, pitch: camera.pitch || 0, bearing: camera.bearing || 0, offset, duration });
   }, [ready, JSON.stringify(camera), JSON.stringify(padding)]);
 
   useEffect(() => {

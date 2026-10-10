@@ -6,7 +6,7 @@ export default function Sheet({ children, label, className = "", onResize = null
 
   useEffect(() => {
     if (!onResize) return;
-    const observer = new ResizeObserver(() => onResize(box.current.offsetHeight));
+    const observer = new ResizeObserver(() => box.current && onResize(box.current.offsetHeight));
     observer.observe(box.current);
     return () => observer.disconnect();
   }, []);
