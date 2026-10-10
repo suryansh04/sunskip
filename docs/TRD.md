@@ -524,7 +524,7 @@ api/
   </^[^.]+$|\.(?!(css|gif|ico|jpg|js|png|txt|svg|woff|woff2|ttf|map|json|webp|webmanifest)$)([^.]+$)/>
   ```
   Page URLs load the app; JS, CSS, icons and the manifest still load (tested). A plain `/<*>` rule would break them.
-- **CORS lives in API Gateway only.** Don't add CORS in FastAPI too, or the headers get doubled.
+- **CORS lives in API Gateway only.** Don't add CORS in FastAPI too, or the headers get doubled. Browsers' `OPTIONS` pre-checks still reach the API through the `ANY` route; the API answers them `204` with no body (no `X-Client-Id` needed) and the gateway adds the CORS headers.
 - **Cost:** about $3/day from the free-plan credits (EC2 ~$2.3, RDS ~$0.7). Stop EC2 and RDS when they're not needed after the hackathon.
 - **Live (deployed 9 Oct):** API `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1`, bucket `sunskip-shade-056362973989`, database `sunskip-db`, secret `sunskip/prod`, Cognito domain `sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com`. Containers must reach the instance role, so the EC2 metadata hop limit is 2.
 - **How it was deployed:** the code goes up as a `git archive` of `api/` from `main` to S3 and is set up on the server through Systems Manager (§8.2). For the first deploy, the local database was copied as a data-only `pg_dump` of the shade, map and demand tables (no request logs) and the shade files with `aws s3 sync`, so no Solar calls were spent again.
@@ -655,7 +655,7 @@ volumes:
    | `ANY /v1/{proxy+}`        | `http://<elastic-ip>:8000/v1/{proxy}`        | none        |
    - The more specific portal route wins, so `/portal/*` always needs a login.
    - On **both** integrations add the request parameter `overwrite:header.X-Origin-Secret` = the `ORIGIN_SECRET` value. `overwrite` replaces any value a caller sends.
-   - CORS is set on the API, so the gateway answers browser `OPTIONS` pre-checks itself, before the authorizer.
+   - CORS is set on the API. Browser `OPTIONS` pre-checks skip the JWT authorizer and reach the API, which answers them `204`; the gateway adds the CORS headers.
    - The public URL is then `https://<api-id>.execute-api.ap-southeast-2.amazonaws.com/v1/...`, matching `api.md`.
 
 ### 8.2 Running production (tested 9 Oct)
