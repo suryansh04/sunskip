@@ -245,7 +245,7 @@ export default function Navigate() {
       {view === "ar" && (
         <Suspense fallback={<p className="absolute inset-0 grid place-items-center bg-ink text-[16px] text-white">Opening the camera…</p>}>
           <div className="fixed inset-0 z-40 animate-ar-open">
-            <ARView key={legKey} waypoints={points} desk={params.get("desk") === "1"} onSwitchToMap={() => show("map")} onClose={endWalk} onUseArrow={(reason) => show("arrow", reason)} />
+            <ARView waypoints={points} desk={params.get("desk") === "1"} onSwitchToMap={() => show("map")} onClose={endWalk} onUseArrow={(reason) => show("arrow", reason)} />
           </div>
         </Suspense>
       )}

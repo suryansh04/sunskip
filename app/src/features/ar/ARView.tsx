@@ -10,10 +10,13 @@ import {
   COLOR_UNKNOWN,
   COMPASS_LOOKAHEAD_M,
   GPS_GATE_ACCURACY_M,
+  GPS_GATE_EXIT_ACCURACY_M,
+  GPS_GATE_EXIT_SECONDS,
   GPS_GATE_SECONDS,
   GPS_GOOD_ACCURACY_M,
-  HUD_HEADING_SMOOTHING_S,
   PIN_VISIBLE_WITHIN_M,
+  POSITION_GLIDE_S,
+  POSITION_JUMP_M,
   REALIGN_PROMPT_CLEAR_M,
   SNAP_MAX_OFFSET_M,
   START_LABEL_AHEAD_M,
@@ -27,7 +30,7 @@ import {
 } from './config.ts'
 import { createConveyor } from './conveyor.ts'
 import type { PathPoint } from './conveyor.ts'
-import { bearingDeg, deltaDeg, destinationPoint, distanceM, normalizeDeg } from './geo.ts'
+import { bearingDeg, deltaDeg, destinationPoint, distanceM } from './geo.ts'
 import type { LatLng } from './geo.ts'
 import { createFixSmoother, watchGps } from './gps.ts'
 import InstructionCard from './InstructionCard.tsx'
@@ -81,7 +84,10 @@ export interface ArDebugInfo {
 }
 
 export interface ARViewProps {
-  /** The route to walk. Give ARView a new `key` when swapping in a different route. */
+  /**
+   * The route to walk. A new array with the same waypoints changes nothing; different waypoints
+   * (a reroute, the next walk) are drawn in place, without restarting the camera.
+   */
   waypoints: readonly Waypoint[]
   /** Desk mode: no camera or sensors, a slider moves a fake position along the route. */
   desk?: boolean
@@ -106,6 +112,8 @@ interface ViewActions {
   /** Apply an offset the walker has confirmed. */
   confirmAlign(offsetDeg: number): void
   resetAlign(): void
+  /** Draw a different route on the stage that is already running. */
+  setRoute(route: Route): void
 }
 
 /** Something that stops AR from running, and the one thing the walker can do about it. */
@@ -257,7 +265,13 @@ export default function ARView({
   const moveDeskRef = useRef<((progressM: number) => void) | null>(null)
   const actionsRef = useRef<ViewActions | null>(null)
 
-  const route = useMemo(() => buildRoute(waypoints), [waypoints])
+  // The host may pass a new array on every render (each GPS fix): only different waypoints are a new route.
+  const routeKey = waypoints
+    .map((waypoint) => `${waypoint.location.lat},${waypoint.location.lng},${waypoint.inSun}`)
+    .join(';')
+  const route = useMemo(() => buildRoute(waypoints), [routeKey])
+  const hasRoute = route !== null
+  const latestRoute = useRef(route)
 
   const [deskProgressM, setDeskProgressM] = useState(0)
   const [gps, setGps] = useState<GpsStatus>(desk ? 'ok' : 'waiting')
@@ -276,9 +290,19 @@ export default function ARView({
 
   const reportDebug = useEffectEvent((info: ArDebugInfo) => onDebug?.(info))
 
+  // A different route goes to the running stage. (On mount there is no stage yet: it reads latestRoute.)
+  useEffect(() => {
+    latestRoute.current = route
+    if (route) actionsRef.current?.setRoute(route)
+  }, [route])
+
+  // The stage (renderer, camera feed, motion sensors, GPS watch) is built once per mount. Rebuilding
+  // it restarts the camera and loses the world origin, which shows as flicker and stray arrows.
   useEffect(() => {
     const host = hostRef.current
-    if (!host || !route) return
+    if (!host || !latestRoute.current) return
+    // Shadows the prop on purpose: this is the route being drawn, replaced by setRoute() below.
+    let route: Route = latestRoute.current
 
     const stage = createArStage(host, {
       desk: desk ? { headingDeg: bearingAt(route, 0), pitchDeg: 0 } : undefined,
@@ -298,7 +322,11 @@ export default function ARView({
     stage.world.add(label.sprite)
 
     let position: LatLng | null = null
+    /** The last fix handed to moveTo, kept to find the walker's place on a new route. */
+    let lastFix: LatLng | null = null
     let progressM = 0
+    /** Progress the chevrons are drawn for: it slides to progressM along with the camera. */
+    let shownProgressM: number | null = null
     let offRouteM = 0
     let snapped = false
     let accuracyM: number | null = null
@@ -347,6 +375,7 @@ export default function ARView({
 
     /** Take a (smoothed) fix: snap it to the route, move the camera, redraw. */
     const moveTo = (fix: LatLng) => {
+      lastFix = fix
       const previousM = position ? progressM : null
       const snap = snapToRoute(route, fix, previousM)
       progressM = snap.progressM
@@ -400,10 +429,31 @@ export default function ARView({
       },
       confirmAlign: applyHeadingOffset,
       resetAlign: () => applyHeadingOffset(0),
+      setRoute: (next) => {
+        if (next === route) return
+        route = next
+        // Progress on the old route means nothing on this one: find the walker's place afresh.
+        position = null
+        progressM = 0
+        shownProgressM = null
+        pathReady = false
+        conveyor.setPath([], [])
+        setRealignPrompt(null)
+        if (desk) {
+          setDeskProgressM(0)
+          moveDeskRef.current?.(0)
+        } else if (lastFix) {
+          moveTo(lastFix)
+        } else {
+          layout()
+        }
+      },
     }
 
     // --- Accuracy gate: poor GPS for a while hides the 3D content, the 2D arrow takes over. ---
     let poorSinceMs: number | null = null
+    /** Since when accuracy has been good enough to bring the 3D arrows back. */
+    let goodSinceMs: number | null = null
     let gatedNow = false
     const setGate = (on: boolean) => {
       if (on === gatedNow) return
@@ -422,9 +472,12 @@ export default function ARView({
           setGps('ok')
           if (fix.accuracyM > GPS_GATE_ACCURACY_M) {
             poorSinceMs ??= performance.now()
+            goodSinceMs = null
           } else {
             poorSinceMs = null
-            setGate(false)
+            // Between the two limits nothing changes, so one fix either side can't flip the view.
+            if (fix.accuracyM <= GPS_GATE_EXIT_ACCURACY_M) goodSinceMs ??= performance.now()
+            else goodSinceMs = null
           }
           const smoothed = smoother.push(fix)
           if (smoothed) moveTo(smoothed)
@@ -435,6 +488,7 @@ export default function ARView({
           } else if (failure === 'unavailable') {
             // Signal lost after we had it: treat like poor accuracy.
             poorSinceMs ??= performance.now()
+            goodSinceMs = null
           }
           // A timeout once fixes have arrived is ignored: it can just mean standing still.
         },
@@ -465,6 +519,7 @@ export default function ARView({
         stage.resume()
         if (!desk && !stopGps) {
           poorSinceMs = null
+          goodSinceMs = null
           stopGps = startGps()
         }
       }
@@ -472,12 +527,16 @@ export default function ARView({
     document.addEventListener('visibilitychange', onVisibilityChange)
     if (document.hidden) onVisibilityChange()
 
-    let hudHeadingDeg: number | null = null
     let shownCard: CardInfo | null = null
     let elapsed = 0
     let frames = 0
     stage.onFrame((dtSeconds) => {
-      conveyor.update(dtSeconds, progressM)
+      // Each fix moves progress by a metre or more: slide there, or the chevrons pop in and out.
+      shownProgressM =
+        shownProgressM === null || Math.abs(progressM - shownProgressM) > POSITION_JUMP_M
+          ? progressM
+          : shownProgressM + (progressM - shownProgressM) * (1 - Math.exp(-dtSeconds / POSITION_GLIDE_S))
+      conveyor.update(dtSeconds, shownProgressM)
       pin.fitToView(stage.camera)
       label.fitToView(stage.camera)
 
@@ -487,20 +546,18 @@ export default function ARView({
         performance.now() - poorSinceMs >= GPS_GATE_SECONDS * 1000
       ) {
         setGate(true)
+      } else if (
+        gatedNow &&
+        goodSinceMs !== null &&
+        performance.now() - goodSinceMs >= GPS_GATE_EXIT_SECONDS * 1000
+      ) {
+        setGate(false)
       }
 
-      // Low-passed heading for the 2D arrow, which would otherwise shiver with the compass.
+      // The stage's heading is already steadied, so the 2D arrow and the 3D arrows turn together.
       const facingDeg = stage.getFacingDeg()
-      hudHeadingDeg =
-        hudHeadingDeg === null
-          ? facingDeg
-          : normalizeDeg(
-              hudHeadingDeg +
-                deltaDeg(hudHeadingDeg, facingDeg) *
-                  (1 - Math.exp(-dtSeconds / HUD_HEADING_SMOOTHING_S)),
-            )
       if (gatedNow && compassArrowRef.current) {
-        const turnDeg = deltaDeg(hudHeadingDeg, guideBearingDeg)
+        const turnDeg = deltaDeg(facingDeg, guideBearingDeg)
         compassArrowRef.current.style.transform = `rotate(${turnDeg.toFixed(1)}deg)`
       }
 
@@ -543,7 +600,7 @@ export default function ARView({
       label.dispose()
       stage.dispose()
     }
-  }, [route, desk])
+  }, [desk, hasRoute])
 
   // --- What to tell the walker when AR can't run (first match wins) ---------------------------
   const denied = [

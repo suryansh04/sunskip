@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { ArrowUp, CameraSlash, CubeFocus, MapTrifold } from "@phosphor-icons/react";
 import { turnBetween } from "../geo";
+import { createHeadingSmoother, headingFromOrientation } from "../features/ar/heading";
 import Button from "./Button";
 import AheadCard from "./AheadCard";
 
@@ -20,12 +21,18 @@ export default function ArrowBackup({ instruction, ahead, arrived, bearingDeg, c
   const compassEvent: any = window.DeviceOrientationEvent;
 
   useEffect(() => {
+    const smoother = createHeadingSmoother();
+    let lastEventMs = 0;
     // Set straight on the element: the compass fires many times a second
     function turnArrow(event) {
-      // iPhones give the heading itself; Android gives alpha, which runs the other way round
-      const heading = event.webkitCompassHeading ?? (event.absolute && event.alpha !== null ? 360 - event.alpha : null);
+      // iPhones give the heading itself. Android gives three angles, and it takes all of them:
+      // alpha alone is only the heading while the phone lies flat, and jumps when it is tilted.
+      const fromAngles = event.absolute && event.alpha !== null ? headingFromOrientation(event.alpha, event.beta, event.gamma, window.screen.orientation?.angle ?? 0) : null;
+      const heading = event.webkitCompassHeading ?? fromAngles;
       if (heading === null || !arrow.current) return;
-      arrow.current.style.transform = `rotate(${turnBetween(heading, walkBearing.current)}deg)`;
+      const steady = smoother.update(heading, lastEventMs ? (event.timeStamp - lastEventMs) / 1000 : 0);
+      lastEventMs = event.timeStamp;
+      arrow.current.style.transform = `rotate(${turnBetween(steady, walkBearing.current)}deg)`;
       setHasCompass(true);
     }
     window.addEventListener("deviceorientationabsolute", turnArrow);
@@ -39,7 +46,7 @@ export default function ArrowBackup({ instruction, ahead, arrived, bearingDeg, c
   return (
     <div className="absolute inset-0 z-[3] flex animate-fade flex-col bg-paper">
       <div className="flex flex-1 flex-col items-center justify-center gap-1.5 pt-[90px]">
-        <span ref={arrow} className={`grid size-[170px] place-items-center rounded-full transition-transform duration-200 ${ARROW_LOOK[ahead.bit]}`}>
+        <span ref={arrow} className={`grid size-[170px] place-items-center rounded-full ${ARROW_LOOK[ahead.bit]}`}>
           <ArrowUp size={110} weight="fill" aria-hidden />
         </span>
         <b className="wide mt-3.5 text-[44px] font-[760]">{arrived ? "0 m" : `${instruction.meters} m`}</b>
