@@ -7,4 +7,6 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+# Keep idle connections open longer than API Gateway reuses them: with uvicorn's default 5 s the gateway sometimes
+# sends a request down a connection uvicorn is closing, and a POST then fails with 503 (GETs it retries quietly)
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--timeout-keep-alive", "75"]
