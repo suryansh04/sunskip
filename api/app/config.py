@@ -104,7 +104,8 @@ class Settings(BaseSettings):
     tts_max_chars: int = 500
     stt_max_bytes: int = 5_000_000  # a 30 s clip is well under this
     voice_max_steps: int = 30
-    voice_parallel_calls: int = 5
+    voice_parallel_calls: int = 10
+    voice_budget_s: float = 20  # steps not spoken by then are read by the app
     voice_calls_per_device_per_day: int = 60
     voice_calls_per_day: int = 3000
     claude_model: str = "claude-sonnet-5-5"

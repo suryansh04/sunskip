@@ -2,6 +2,7 @@
 the run starts, e.g. "Head south along GHS footpath for 50 m. This part is in sun. Then turn right."."""
 
 import asyncio
+import time
 from dataclasses import dataclass
 from uuid import UUID
 
@@ -60,7 +61,7 @@ def shade_note(points: list[Waypoint], run: Run) -> str:
 def what_next(points: list[Waypoint], run: Run) -> str:
     end = points[run.end]
     if run.end == len(points) - 1:
-        return "Then you arrive."
+        return "Then you reach your destination."
     if points[run.end + 1].leg_index != end.leg_index:
         return "Then you reach your stop."  # a ride comes before the next walk
     return f"Then {end.cue[0].lower()}{end.cue[1:]}." if end.cue else ""
@@ -77,19 +78,24 @@ def direction_steps(points: list[Waypoint], max_steps: int) -> list[tuple[float,
     """(metres from the start where it is said, English text), in walking order."""
     steps = [(points[run.start].distance_from_start_m, step_text(points, run)) for run in runs_of(points)]
     if points:
-        steps.append((points[-1].distance_from_start_m, "You have arrived."))
+        steps.append((points[-1].distance_from_start_m, "You have reached your destination."))
     return steps[:max_steps]
 
 
 async def spoken_directions(trip_id: UUID, option_id: str, language: str) -> list[VoiceStep]:
-    """Every step of the walk, translated and spoken (a few at a time). A step whose voice fails keeps its text."""
+    """Every step of the walk, translated and spoken (a few at a time). A step whose voice fails, or isn't ready
+    within the time budget (the gateway cuts requests off at 29 s), keeps its English text for the app to read."""
     waypoints = (await trip_waypoints(trip_id, option_id, None)).waypoints
     steps = direction_steps(waypoints, settings.voice_max_steps)
     limit = asyncio.Semaphore(settings.voice_parallel_calls)
+    deadline = time.monotonic() + settings.voice_budget_s
 
     async def say(index: int, at_m: float, text: str) -> VoiceStep:
         async with limit:
-            spoken = await speak(text, language, from_english=True)
+            try:
+                spoken = await asyncio.wait_for(speak(text, language, from_english=True), deadline - time.monotonic())
+            except TimeoutError:
+                return VoiceStep(index=index, trigger_at_meters=at_m, text=text, audio_url=None)
         return VoiceStep(index=index, trigger_at_meters=at_m, text=spoken.text, audio_url=spoken.audio_url)
 
     return list(await asyncio.gather(*(say(index, at_m, text) for index, (at_m, text) in enumerate(steps))))

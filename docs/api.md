@@ -561,7 +561,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **Body:** `{ "tripId", "optionId", "language" }`.
 - **Returns:** `{ "steps": [ { "index": 0, "triggerAtMeters": 0, "text": "...", "audioUrl": "..." } ] }`.
 - **`triggerAtMeters`** uses the same scale as the waypoints' `distanceFromStartM` (endpoint 7): metres walked from the start of the first walk leg, across all walk legs. The app plays a step when the walker's nearest waypoint reaches it.
-- **How:** one step per straight run of the walk, said where it starts: "Head south along GHS footpath for 50 m. This part is in sun. Then turn right.", with "Then you reach your stop." before a ride and a last "You have arrived.". Max 30 (`VOICE_MAX_STEPS`). Each is translated (`mayura:v1`) and spoken (`bulbul:v3`, voice `priya`, MP3), 5 at a time.
+- **How:** one step per straight run of the walk, said where it starts: "Head south along GHS footpath for 50 m. This part is in sun. Then turn right.", with "Then you reach your stop." before a ride and a last "You have reached your destination.". Max 30 (`VOICE_MAX_STEPS`). Each is translated (`mayura:v1`) and spoken (`bulbul:v3`, voice `priya`, MP3), 10 at a time; a step not ready within `VOICE_BUDGET_S` (20 s) is sent in English with `audioUrl: null`.
 - **Audio** is cached in S3 as `audio/{sha256(text|language|voice|source)}.mp3` with the spoken words in a `.txt` beside it, so a step is made once ever; links are presigned for `AUDIO_URL_TTL_S`. A step whose translation or voice fails keeps its text (English if the translation failed) with `audioUrl: null`. Without S3 (local runs) `audioUrl` is always null.
 
 ### 11. `POST /voice/tts`
@@ -836,7 +836,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | claude-sonnet-5-5, saaras:v3, mayura:v1, bulbul:v3, priya |
 | `AGENT_MAX_TOOL_ROUNDS`, `AGENT_MAX_RETRIES`, `AGENT_HISTORY_MESSAGES`, `AGENT_BUDGET_S`, `AGENT_NUMBER_TOLERANCE` | 4, 2, 20, 20, 1 |
 | `AGENT_QUESTIONS_PER_DEVICE_PER_DAY`, `AGENT_QUESTIONS_PER_DAY`, `VOICE_CALLS_PER_DEVICE_PER_DAY`, `VOICE_CALLS_PER_DAY` | 30, 1000, 60, 3000 |
-| `TTS_MAX_CHARS`, `STT_MAX_BYTES`, `VOICE_MAX_STEPS`, `VOICE_PARALLEL_CALLS` | 500, 5000000, 30, 5 |
+| `TTS_MAX_CHARS`, `STT_MAX_BYTES`, `VOICE_MAX_STEPS`, `VOICE_PARALLEL_CALLS`, `VOICE_BUDGET_S` | 500, 5000000, 30, 10, 20 |
 | `USE_FAKES`                                                                                          | false (true returns the pilot numbers)    |
 | `OUTSIDE_CALL_TIMEOUT_S`                                                                             | 10                                        |
 | `AGENT_LIVE`, `VOICE_LIVE` (shown in `/meta` `features`; on in production once the keys are in)      | false, false                              |

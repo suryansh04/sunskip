@@ -37,8 +37,8 @@ def _stored(key: str) -> Spoken | None:
 
 
 def _store(key: str, text: str, audio: bytes) -> Spoken:
-    save_file(f"{key}.txt", text.encode())
-    save_file(f"{key}.mp3", audio)
+    save_file(f"{key}.txt", text.encode(), "text/plain; charset=utf-8")
+    save_file(f"{key}.mp3", audio, "audio/mpeg")
     return Spoken(text, file_url(f"{key}.mp3"), cached=False)
 
 
