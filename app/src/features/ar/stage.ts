@@ -7,6 +7,8 @@ import {
   CAMERA_NEAR_M,
   MAX_PIXEL_RATIO,
   ORIENTATION_SMOOTHING_FACTOR,
+  POSITION_GLIDE_S,
+  POSITION_JUMP_M,
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
 } from './config.ts'
@@ -36,7 +38,10 @@ export interface ArStage {
   /** Parent for everything anchored to the ground. */
   readonly world: THREE.Group
   readonly camera: THREE.PerspectiveCamera
-  /** Move the viewer. The first call fixes the world origin. */
+  /**
+   * Move the viewer. The first call fixes the world origin; after that the camera glides to each
+   * new point, and only jumps there when it is far away.
+   */
   setPosition(point: LatLng): void
   /** World x/z of a point, or null until the first setPosition. */
   toWorld(point: LatLng): { x: number; z: number } | null
@@ -146,6 +151,23 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
       if (!lookingDown) facing.negate()
     }
     return normalizeDeg(THREE.MathUtils.radToDeg(Math.atan2(facing.x, -facing.z)))
+  }
+
+  // --- Position ------------------------------------------------------------------------------
+  /** World x/z the camera is gliding to, or null when it is there. */
+  let glideTo: { x: number; z: number } | null = null
+
+  const glideCamera = (dtSeconds: number) => {
+    if (!glideTo) return
+    const blend = 1 - Math.exp(-dtSeconds / POSITION_GLIDE_S)
+    camera.position.x += (glideTo.x - camera.position.x) * blend
+    camera.position.z += (glideTo.z - camera.position.z) * blend
+    if (Math.hypot(glideTo.x - camera.position.x, glideTo.z - camera.position.z) < 0.01) {
+      camera.position.x = glideTo.x
+      camera.position.z = glideTo.z
+      glideTo = null
+    }
+    applyHeadingOffset()
   }
 
   // --- Camera feed -------------------------------------------------------------------------
@@ -305,6 +327,7 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
       lastFrameMs === null ? 0 : Math.min((timeMs - lastFrameMs) / 1000, MAX_FRAME_S)
     lastFrameMs = timeMs
     controls?.update()
+    glideCamera(dtSeconds)
     frameCallbacks.forEach((callback) => callback(dtSeconds))
     renderer.render(scene, camera)
   }
@@ -314,9 +337,20 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
     world,
     camera,
     setPosition(point) {
-      locar.fakeGps(point.lng, point.lat)
-      hasPosition = true
-      applyHeadingOffset()
+      if (!hasPosition) {
+        locar.fakeGps(point.lng, point.lat)
+        hasPosition = true
+        applyHeadingOffset()
+        return
+      }
+      const [x, z] = locar.lonLatToWorldCoords(point.lng, point.lat)
+      glideTo = { x, z }
+      if (Math.hypot(x - camera.position.x, z - camera.position.z) > POSITION_JUMP_M) {
+        camera.position.x = x
+        camera.position.z = z
+        glideTo = null
+        applyHeadingOffset()
+      }
     },
     toWorld(point) {
       if (!hasPosition) return null

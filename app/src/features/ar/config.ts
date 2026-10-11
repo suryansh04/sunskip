@@ -35,6 +35,9 @@ export const GPS_MIN_MOVE_M = 1
 /** GPS accuracy worse than this, for this long, swaps the 3D arrows for the 2D compass arrow. */
 export const GPS_GATE_ACCURACY_M = 15
 export const GPS_GATE_SECONDS = 5
+/** The 3D arrows only come back after accuracy has been this good for this long, so the view doesn't flip. */
+export const GPS_GATE_EXIT_ACCURACY_M = 12
+export const GPS_GATE_EXIT_SECONDS = 2
 /** The HUD dot is green at or below this accuracy, amber up to the gate, red beyond it. */
 export const GPS_GOOD_ACCURACY_M = 8
 
@@ -43,6 +46,13 @@ export const SNAP_MAX_OFFSET_M = 25
 /** Look for the snap point this far behind / ahead of the last progress before anywhere else. */
 export const SNAP_SEARCH_BACK_M = 30
 export const SNAP_SEARCH_AHEAD_M = 80
+
+// --- Position -----------------------------------------------------------------------------------
+
+/** The camera glides to each new fix over about this long instead of jumping there. */
+export const POSITION_GLIDE_S = 0.5
+/** A move longer than this (the first good fix after a bad one, a new route) is a jump, not a glide. */
+export const POSITION_JUMP_M = 20
 
 // --- Heading ------------------------------------------------------------------------------------
 
