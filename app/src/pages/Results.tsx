@@ -51,6 +51,7 @@ export default function Results() {
   const [loading, setLoading] = useState(true);
   const [failure, setFailure] = useState(null);
   const [attempt, setAttempt] = useState(0);
+  const [replanFailed, setReplanFailed] = useState(false);
   const [heatOpen, setHeatOpen] = useState(false);
   const [sheetHeight, setSheetHeight] = useState(0);
   const [askLive, setAskLive] = useState(false);
@@ -66,6 +67,7 @@ export default function Results() {
     }
     setLoading(true);
     setFailure(null);
+    setReplanFailed(false);
     const body = planRequest(search.origin, search.destination, search.at || istIso(now()), search.when === "arrive");
     setRequest(body);
     api
@@ -82,10 +84,14 @@ export default function Results() {
   useEffect(() => {
     setPoints([]);
     if (!shown) return;
+    let current = true; // the points of an option no longer shown are dropped
     api
       .get(`/routes/${plan.tripId}/options/${shown.optionId}/waypoints`)
-      .then((res) => setPoints(res.data.waypoints))
-      .catch((err) => err.response?.status === 404 && planAgain());
+      .then((res) => current && setPoints(res.data.waypoints))
+      .catch((err) => current && err.response?.status === 404 && planAgain());
+    return () => {
+      current = false;
+    };
   }, [plan?.tripId, shown?.optionId]);
 
   useEffect(() => {
@@ -97,7 +103,7 @@ export default function Results() {
     api
       .post("/routes/plan", request)
       .then((res) => setPlan(res.data))
-      .catch(() => {}); // keep the plain routes that are already on screen
+      .catch(() => setReplanFailed(true)); // keep the plain routes that are already on screen, and let them be opened
   }
 
   // A trip is kept for 30 minutes; after that (404) the search runs again
@@ -109,7 +115,8 @@ export default function Results() {
   if (!hasSearch) return null;
 
   const { origin, destination } = search;
-  const preparing = plan?.shade.status === "PREPARING" && !gaveUp;
+  const stalled = gaveUp || replanFailed; // no ranked routes are coming by themselves
+  const preparing = plan?.shade.status === "PREPARING" && !stalled;
   const cellsDone = progress?.cellsDone ?? plan?.shade.cellsDone;
   const cellsTotal = progress?.cellsTotal ?? plan?.shade.cellsTotal;
   // For "arrive by" the API picks the leave time; every option leaves then
@@ -208,7 +215,7 @@ export default function Results() {
                   total={cellsTotal}
                 />
               )}
-              {plan.shade.status === "PREPARING" && gaveUp && (
+              {plan.shade.status === "PREPARING" && stalled && (
                 <ShadeNotice
                   icon={<HourglassMedium size={20} weight="bold" />}
                   title="Shade data is taking longer than usual"
