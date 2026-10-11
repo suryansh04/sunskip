@@ -49,7 +49,7 @@ export default function Search() {
   const [lookFailed, setLookFailed] = useState(false);
   const typed = query.trim();
 
-  // Names of hostels, gates, stops and shops near the start, from OSM (GET /places)
+  // Names of hostels, gates, stops and shops near the start, from OSM (GET /places); looked up again if the start moves
   useEffect(() => {
     setNearby([]);
     setLookFailed(false);
@@ -68,7 +68,7 @@ export default function Search() {
       current = false;
       clearTimeout(timer);
     };
-  }, [typed]);
+  }, [typed, start.lat, start.lng]);
 
   function save(change) {
     const next = { ...search, ...change };
