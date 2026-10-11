@@ -30,14 +30,21 @@ export default function TimeSheet({ search, onPick, onClose }) {
   const [loading, setLoading] = useState(Boolean(search.destination));
   const [error, setError] = useState("");
 
+  // Home may still be finding where the walker is: the hours are checked once the start is known
   useEffect(() => {
     if (!search.destination || !search.origin) return;
+    let current = true;
+    setLoading(true);
+    setError("");
     api
       .post("/routes/best-time", bestTimeRequest(search.origin, search.destination, dayIso, FIRST_HOUR, LAST_HOUR))
-      .then((res) => setBest(res.data))
-      .catch(() => setError("Can't load the sun minutes right now. You can still pick a time."))
-      .finally(() => setLoading(false));
-  }, []);
+      .then((res) => current && setBest(res.data))
+      .catch(() => current && setError("Can't load the sun minutes right now. You can still pick a time."))
+      .finally(() => current && setLoading(false));
+    return () => {
+      current = false;
+    };
+  }, [search.origin?.lat, search.origin?.lng]);
 
   const sunAt = (h) => best?.slots.find((slot) => hourOf(slot.departAt) === h)?.sunMinutes;
   const bestHour = best?.best ? hourOf(best.best.departAt) : null;
