@@ -1,8 +1,9 @@
-import { useLocation } from "react-router";
+import { useLocation, useNavigate } from "react-router";
 import { Cube, Fire, SignIn, Tree } from "@phosphor-icons/react";
-import { login } from "../auth";
+import { DEMO, login } from "../auth";
 import { setSource, showLayers } from "../map";
 import MapView from "../components/MapView";
+import DemoAccount from "../components/DemoAccount";
 import mujPain from "../api/fixtures/heat-pain.json";
 
 const MAP_CENTER = [75.5632, 26.8424];
@@ -23,6 +24,7 @@ function drawPain(map) {
 // Sign in (P1): the real heat-pain map on the left, what the portal does and the sign-in button on the right
 export default function Login() {
   const location = useLocation();
+  const navigate = useNavigate();
   const next = location.state?.next || "/";
   const shown = mujPain.features.find((feature) => feature.properties.stretchId === SHOWN)?.properties;
 
@@ -37,7 +39,7 @@ export default function Login() {
           </div>
         )}
       </div>
-      <div className="flex flex-col bg-ink px-14 pt-10 pb-11 text-white">
+      <div className="flex flex-col overflow-y-auto bg-ink px-14 pt-10 pb-11 text-white">
         <div className="cond flex items-center gap-2.5 text-[23px]">
           <img src="/favicon.svg" alt="" className="size-6" />
           SunSkip
@@ -62,6 +64,7 @@ export default function Login() {
         <p className="mt-4 max-w-[46ch] text-[13px] text-bartext">
           You'll sign in on the secure AWS login page and come back here. For city, campus and transit teams; ask your SunSkip contact for an account.
         </p>
+        {DEMO.email && DEMO.password && <DemoAccount next={next} onSignedIn={(page) => navigate(page, { replace: true })} />}
       </div>
     </div>
   );

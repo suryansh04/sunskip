@@ -11,7 +11,8 @@ const TOOLS = [
 
 // The simulator's controls over the map: tools, Before / After, and what a click will add.
 // The panel has no position of its own, so these are placed in <main> over the map.
-export default function SimOverlays({ tool, onTool, onResetView, showView, view, onView, treeKind, onTreeKind, shelterKind, onShelterKind }) {
+// planNote says the items on the map are a plan, not what stands there today
+export default function SimOverlays({ tool, onTool, onResetView, showView, view, onView, treeKind, onTreeKind, shelterKind, onShelterKind, planNote }) {
   const adding = tool === "TREE" ? { list: TREES, value: treeKind, onPick: onTreeKind } : { list: SHELTERS, value: shelterKind, onPick: onShelterKind };
   return (
     <>
@@ -33,6 +34,11 @@ export default function SimOverlays({ tool, onTool, onResetView, showView, view,
           <Compass size={23} weight="bold" />
         </button>
       </div>
+      {planNote && (
+        <div className="absolute top-5 left-[calc((100%-560px)/2)] z-[3] -translate-x-1/2 border-2 border-ink bg-white px-3.5 py-2 text-[13.5px] whitespace-nowrap">
+          <b className="font-bold">{planNote.from}</b> · {planNote.what} · <span className="text-muted">not what stands there today</span>
+        </div>
+      )}
       {showView && (
         <div className="absolute top-5 right-[580px] z-[3] flex border-2 border-ink bg-white">
           {["before", "after"].map((which) => (
