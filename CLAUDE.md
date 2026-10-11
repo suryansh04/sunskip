@@ -46,7 +46,7 @@ sunskip_app/
 ├── CLAUDE.md
 ├── README.md              what it is, architecture, local setup
 ├── docs/                  PRD.md  TRD.md  api.md  schema.md  design.md  plans/
-├── .github/workflows/     ci.yml (ruff for api, npm build for app; add a portal job once portal/ exists)
+├── .github/workflows/     ci.yml (ruff for api, npm build for app and portal)
 ├── .gitignore
 │
 ├── api/                   FastAPI + worker (Python 3.12)
@@ -84,9 +84,10 @@ sunskip_app/
 │
 └── portal/                officials portal (Vite + React, desktop, Cognito login)
     ├── src/
-    │   ├── main.tsx  index.css  types.ts  auth.ts
-    │   ├── api/               client.ts, fixtures/
-    │   ├── components/        MapView, StretchList, HourGrid, ...
+    │   ├── main.tsx  index.css  types.ts  auth.ts (Cognito code + PKCE)
+    │   ├── areas.ts  bands.ts  format.ts  map.ts  shapes.ts (3D trees and shelters)
+    │   ├── api/               client.ts, fixtures/, useShadeJob.ts
+    │   ├── components/        MapView, TopBar, PainList, RecRow, SunGrid, StretchDrawing, ItemEditor, SimResult, ...
     │   └── pages/             Login, Callback, HeatPain, Recommendations, Stretch, Simulate, Stats
     └── index.html  package.json  vite.config.ts  tsconfig.json  .env.example
 ```

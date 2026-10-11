@@ -212,7 +212,7 @@ sunskip/                    (repo root)
   api/                      FastAPI + worker (§5.2)
   app/                      student app (below)
   portal/                   officials portal (below)
-  .github/workflows/        CI on every push to main and every pull request: ruff for api, `npm ci && npm run build` for app; add the portal job when it exists
+  .github/workflows/        CI on every push to main and every pull request: ruff for api, `npm ci && npm run build` for app and for portal
   .gitignore
 ```
 
@@ -236,7 +236,7 @@ app/                                 portal/
 ```
 
 - **No npm workspaces.** `app/` and `portal/` are two independent Vite projects, each with its own `package.json` and `node_modules`. Run `npm install` inside each folder.
-- **Shared files are copies.** `types.ts`, `api/client.ts`, `MapView.tsx` and the fixtures exist in both. When an API shape changes, update both copies in the same PR.
+- **Shared files are copies.** `types.ts`, `api/client.ts` and `api/useShadeJob.ts` exist in both and stay identical. When an API shape changes, update both copies in the same PR. `MapView.tsx` and the fixtures exist in both but differ: the app's map draws one trip, the portal's draws stretches, pins and 3D items; each front end mocks its own endpoints.
 
 ### 2.7 Test-built setup (copy these files)
 
@@ -384,53 +384,20 @@ The screens, states, colours, font, icons and map style are in [design.md](desig
 
 ### 4.1 Login (simplest working option)
 
-We use **Cognito's hosted login page** with a redirect. There is no auth library.
+We use **Cognito's hosted login page** with a redirect and the **authorization code + PKCE** flow (the OAuth way for browser apps). There is no auth library: `portal/src/auth.ts` is about 120 lines.
 
-**`src/auth.ts`**
-
-```ts
-const domain = import.meta.env.VITE_COGNITO_DOMAIN; // https://sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com
-const clientId = import.meta.env.VITE_COGNITO_CLIENT_ID;
-const redirect = window.location.origin + "/callback";
-
-export function login() {
-  window.location.href =
-    `${domain}/oauth2/authorize?client_id=${clientId}&response_type=token` +
-    `&scope=openid+email&redirect_uri=${encodeURIComponent(redirect)}`;
-}
-export function saveTokenFromUrl() {
-  // call on /callback
-  const p = new URLSearchParams(window.location.hash.slice(1));
-  const token = p.get("id_token");
-  if (token) {
-    localStorage.setItem("idToken", token);
-    localStorage.setItem(
-      "idTokenExp",
-      String(Date.now() + Number(p.get("expires_in")) * 1000),
-    );
-  }
-}
-export function isLoggedIn() {
-  return (
-    !!localStorage.getItem("idToken") &&
-    Date.now() < Number(localStorage.getItem("idTokenExp"))
-  );
-}
-export function logout() {
-  localStorage.removeItem("idToken");
-  window.location.href = `${domain}/logout?client_id=${clientId}&logout_uri=${encodeURIComponent(window.location.origin)}`;
-}
-```
-
-- **Guard:** in `main.tsx`, if `!isLoggedIn()` and the route isn't `/callback`, call `login()`.
-- **Expired token:** an axios `401` response also calls `login()`.
+- **Sign in:** `login(next)` makes a random verifier and its SHA-256 challenge, keeps the verifier, a random `state` and the page to return to in `sessionStorage`, and sends the browser to `/oauth2/authorize` (`response_type=code`, scopes `openid email`).
+- **`/callback`:** `finishLogin()` checks `state`, swaps the one-time `code` (plus the verifier) at `/oauth2/token`, and keeps the ID token, its expiry and the refresh token in `localStorage`.
+- **Every call:** an axios interceptor sends `Authorization: Bearer <ID token>`. A minute before the ID token runs out (1 hour), it is renewed with the refresh token (30 days), so officials stay signed in. A `401` clears the session and signs in again.
+- **Guard:** every route but `/login` and `/callback` needs a session; otherwise the sign-in page opens and returns to the page asked for.
+- **Sign out:** clears the tokens and goes through Cognito's `/logout`.
+- **Locally against our own API** there is no login (`VITE_COGNITO_CLIENT_ID` unset): API Gateway is what checks the token.
 - **Cognito setup:**
-  - user pool + app client (public, no secret);
-  - enable the **implicit grant** with scopes `openid email`;
-  - callback URLs: `http://localhost:5174/callback` and the portal's Amplify URL + `/callback`;
-  - sign-out URLs: the same origins.
+  - user pool + app client `sunskip-portal-web` (public, no secret);
+  - OAuth flow **code** only, scopes `openid email`, `ALLOW_REFRESH_TOKEN_AUTH`; ID and access tokens 60 min, refresh token 30 days, token revocation on;
+  - callback URLs: `http://localhost:5174/callback` and `https://main.d2amqkpwwnkri3.amplifyapp.com/callback`;
+  - sign-out URLs: the same origins with `/`.
 - **API Gateway JWT authorizer:** issuer `https://cognito-idp.ap-southeast-2.amazonaws.com/<userPoolId>`, audience = the app client id (the ID token's `aud`).
-- **Trade-off:** implicit grant is the least code. Tokens last 1 hour, and then users log in again. That's fine for a hackathon. Switch to code + PKCE later.
 
 ---
 
@@ -518,8 +485,8 @@ api/
 | RDS             | PostgreSQL 16, `db.t4g.micro`, 20 GB, not public; `CREATE EXTENSION postgis` via `0001_init`                                                                                                                                                                                                              |
 | S3              | One private bucket: `shade/`, `audio/`                                                                                                                                                                                                                                                                    |
 | Secrets Manager | `sunskip/prod`: Google, Anthropic, Sarvam keys, `DATABASE_URL`, `ORIGIN_SECRET`, `CLIENT_ID_SALT`                                                                                                                                                                                                         |
-| API Gateway     | HTTP API, 2 routes (§8.1 step 8); parameter mapping `overwrite:header.X-Origin-Secret` on both integrations; JWT authorizer only on the portal route; throttle 50 req/s; **CORS** for the two Amplify URLs + `localhost:5173` + `localhost:5174`, with headers `Content-Type, X-Client-Id, Authorization` |
-| Cognito         | User pool + public app client, hosted login, implicit grant (§4.1)                                                                                                                                                                                                                                        |
+| API Gateway     | HTTP API, 2 routes (§8.1 step 8); parameter mapping `overwrite:header.X-Origin-Secret` on both integrations; JWT authorizer only on the two portal routes; throttle 50 req/s; **CORS** for the two Amplify URLs + `localhost:5173` + `localhost:5174`, with headers `Content-Type, X-Client-Id, Authorization` |
+| Cognito         | User pool + public app client, hosted login, authorization code + PKCE (§4.1)                                                                                                                                                                                                                             |
 | Amplify Hosting | Two apps from the same GitHub repo, branch `main`: tick **"My app is a monorepo"** and set the app root to `app` for one and `portal` for the other; SPA rewrite rule below; env vars as in §9                                                                                                         |
 | IAM             | EC2 role `sunskip-ec2`: S3 read/write on the bucket, read on the secret, Systems Manager (no SSH key, port 22 closed)                                                                                                                                                                                                                                                 |
 
@@ -531,6 +498,7 @@ api/
 - **CORS lives in API Gateway only.** Don't add CORS in FastAPI too, or the headers get doubled. Browsers' `OPTIONS` pre-checks still reach the API through the `ANY` route; the API answers them `204` with no body (no `X-Client-Id` needed) and the gateway adds the CORS headers.
 - **Cost:** about $3/day from the free-plan credits (EC2 ~$2.3, RDS ~$0.7). Stop EC2 and RDS when they're not needed after the hackathon.
 - **Student app (10 Oct):** `https://main.d2p3yf0fdqcxbz.amplifyapp.com` (Amplify app `d2p3yf0fdqcxbz`, in the API Gateway CORS list). It isn't connected to GitHub yet, so it's deployed by hand: build `app/` with the §9 env vars (no `VITE_DEMO_NOW`, so it uses the real date and time), zip `dist/`, then `aws amplify create-deployment`, upload the zip, `start-deployment`. Connecting the repo (one GitHub sign-in in the Amplify console) makes every push to `main` build by itself.
+- **Portal (11 Oct):** `https://main.d2amqkpwwnkri3.amplifyapp.com` (Amplify app `d2amqkpwwnkri3`, in the API Gateway CORS list and the Cognito callback and sign-out URLs). Deployed by hand the same way: build `portal/` with the §9 env vars (`VITE_USE_MOCKS=false`, the live API URL, `VITE_COGNITO_DOMAIN`, `VITE_COGNITO_CLIENT_ID`), zip `dist/`, `create-deployment`, upload, `start-deployment`.
 - **Live (deployed 9 Oct):** API `https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1`, bucket `sunskip-shade-056362973989`, database `sunskip-db`, secret `sunskip/prod`, Cognito domain `sunskip-056362973989.auth.ap-southeast-2.amazoncognito.com`. Containers must reach the instance role, so the EC2 metadata hop limit is 2.
 - **How it was deployed:** the code goes up as a `git archive` of `api/` from `main` to S3 and is set up on the server through Systems Manager (§8.2). For the first deploy, the local database was copied as a data-only `pg_dump` of the shade, map and demand tables (no request logs) and the shade files with `aws s3 sync`, so no Solar calls were spent again.
 
@@ -656,9 +624,11 @@ volumes:
 
    | Route                     | Integration URL                              | Authorizer  |
    | ------------------------- | -------------------------------------------- | ----------- |
-   | `ANY /v1/portal/{proxy+}` | `http://<elastic-ip>:8000/v1/portal/{proxy}` | Cognito JWT |
-   | `ANY /v1/{proxy+}`        | `http://<elastic-ip>:8000/v1/{proxy}`        | none        |
-   - The more specific portal route wins, so `/portal/*` always needs a login.
+   | `GET /v1/portal/{proxy+}`  | `http://<elastic-ip>:8000/v1/portal/{proxy}` | Cognito JWT |
+   | `POST /v1/portal/{proxy+}` | `http://<elastic-ip>:8000/v1/portal/{proxy}` | Cognito JWT |
+   | `ANY /v1/{proxy+}`         | `http://<elastic-ip>:8000/v1/{proxy}`        | none        |
+   - The more specific portal routes win, so reading `/portal/*` always needs a login.
+   - The portal routes are `GET` and `POST`, not `ANY`: an `ANY` route would send the browser's `OPTIONS` pre-check (which never carries a token) to the JWT authorizer, get `401`, and every portal call would fail in the browser.
    - On **both** integrations add the request parameter `overwrite:header.X-Origin-Secret` = the `ORIGIN_SECRET` value. `overwrite` replaces any value a caller sends.
    - CORS is set on the API. Browser `OPTIONS` pre-checks skip the JWT authorizer and reach the API, which answers them `204`; the gateway adds the CORS headers.
    - The public URL is then `https://<api-id>.execute-api.ap-southeast-2.amazonaws.com/v1/...`, matching `api.md`.
@@ -722,7 +692,7 @@ aws cognito-idp admin-create-user --user-pool-id ap-southeast-2_kb0XfRcnQ --user
   --user-attributes Name=email,Value=official@example.com Name=email_verified,Value=true
 ```
 
-Cognito emails a temporary password. The pool is `sunskip-portal` (`ap-southeast-2_kb0XfRcnQ`). The hosted login page only redirects to `http://localhost:5174/callback` until the portal is on Amplify; its real URL has to be added to the app client and to the API Gateway CORS list then.
+Cognito emails a temporary password; the official sets their own at first sign-in. The pool is `sunskip-portal` (`ap-southeast-2_kb0XfRcnQ`).
 
 #### Stop paying when idle
 
@@ -783,7 +753,7 @@ Never put secrets in `VITE_*` variables: everything in them ships to the browser
 | Map                | Plain `maplibre-gl`                                            | One library, no wrappers                                                 |
 | Portal map layers  | MapLibre line layers (no deck.gl)                              | Enough for coloured stretches                                            |
 | Charts             | Tailwind `div`s and CSS grid                                   | No chart library to learn                                                |
-| Portal login       | Cognito hosted login, implicit grant                           | No auth library; works with the gateway JWT check                        |
+| Portal login       | Cognito hosted login, code + PKCE, refresh token               | No auth library; works with the gateway JWT check; no hourly sign-out    |
 | Map tiles          | OpenFreeMap, URL in env                                        | Free, no key                                                             |
 | Versions           | Vite 7, React Router 7, TS 5.9, Tailwind 4                     | Stable and well documented                                               |
 

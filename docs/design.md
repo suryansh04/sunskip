@@ -1,6 +1,6 @@
 # SunSkip design
 
-The look and behaviour of the student app (`app/`), and the shared design tokens for the officials portal (`portal/`).
+The look and behaviour of the student app (`app/`) and the officials portal (`portal/`, section 12).
 
 - **Live prototype:** https://sunskip-ui.vercel.app (tap through it on a phone)
 - **All screens as images:** `SunSkip UI screens.pdf` (25 screens, ask Suryansh for the file)
@@ -296,14 +296,51 @@ Easing: `cubic-bezier(.2,.8,.2,1)` for everything that enters or moves.
 
 ## 12. Portal (officials)
 
-Same fonts, colours, icons and map style; desktop-first (1280 px and up).
+**Direction: "Signal".** Clear like a transit authority sign: black top bar, big condensed headings, stretches grouped into severity bands, square controls. Same font, icons and map tiles as the app, but its own palette and shapes, because officials triage a list rather than plan one trip. Desktop-first (1280 px and up). The prototype uses real API data for two areas: MUJ and the Bus 26 stop, and Mansarovar Metro.
 
-- Map on the left or centre, a list or detail panel on the right instead of a bottom sheet.
-- Stretch colours on the map: by `painScore` from `sun-tint` → `sun` → `alert` (high pain = red).
-- Big numbers (people per day, sun share, metres) use the same wide 125% style.
-- Ink main buttons, `sunken` secondary buttons, 14 px corners, thin dividers in tables.
+**Layout:**
+- **No sidebar.** A 56 px black bar holds the logo, the four sections as full-height tabs (the active one turns white), the area picker on the right, then the signed-in team and sign out.
+- **Below the bar:** the map on the left and a 560 px white side panel on the right, split by a 2 px black rule.
+- **Each panel:** a big condensed heading, a one-sentence finding with real numbers, a strip of control cells, then the list.
+- **Stretch evidence:** a full-width page that prints on A4.
 
----
+**Type:** Mona Sans throughout. Headings and big numbers use width 75% (condensed), weight 800, and headings are uppercase (64 px panel headings, 84 px page titles, 22–96 px numbers). Body text is 15 px at normal width.
+
+**Shapes:** no rounded corners. Buttons are square: main buttons are black, secondary buttons are white with a 2 px black inset border. Map overlays are white boxes with a 2 px black border. Rows have 1 px `#E3DCD3` dividers, and sections have 2 px black rules.
+
+**Colours (portal):**
+
+| Token | Hex | Use |
+|---|---|---|
+| ink | `#141110` | Top bar, text, main buttons, rank tags |
+| paper | `#FFFFFF` | Panels; `#F4F0EB` for hover and the open row |
+| severe | `#B91C1C` | Pain 70+: map line, band, number |
+| high | `#E8590C` (map) / `#C2410C` (band and text) | Pain 40–69 |
+| moderate | `#F2994A` (map, band with ink text) / `#9A4D0E` (text) | Pain 20–39 |
+| low | `#E9B98B` (map, band with ink text) / `#6B5F55` (text) | Pain under 20 |
+| unknown | `#D8D1C7` | `painScore` is `null` |
+| tree | `#3D6A2B` | Tree pins and icons |
+| shade | `#2F80ED` | Shade after a plan, bars, changed paths |
+| sun grid ramp | `#2F80ED` → `#C9DDF7` → `#FBE3CC` → `#F2994A` → `#D9731F` | Evidence grid cells, sun fraction 0 → 1; `null` is a light hatch |
+
+**Map:** Positron, recoloured to neutral greys (`background #F7F5F2`, `building #E7E2DA`). Stretch lines use the band colour, and their width steps up with the band. Square black rank tags (1–10) sit at each top-ten stretch's midpoint; hovering a tag or a row highlights the stretch in black.
+
+**Screens:**
+
+| # | Screen | What it shows | Data |
+|---|---|---|---|
+| P1 | **Sign in** | Real heat-pain map of MUJ on the left; black panel with "WHERE PEOPLE WALK IN THE SUN.", the three things the portal does, "Sign in with your city account" (Cognito hosted login) | Cognito |
+| P2 | **Heat pain** | Finding sentence (people a day on the top 10, how many are 90%+ in sun); cells: Month, Hours (10 AM – 4 PM or By hour, with a 7 AM – 6 PM slider for May), Export CSV; list grouped into Severe / High / Moderate / Low bands (count and people a day per band), each row: rank, name or "Unnamed path", % in sun, length, people a day, pain; map with band-coloured lines and rank tags; hover ↔ highlight; click opens the evidence; "Part of this area is still being prepared" notice | `/portal/heat-pain` (`month`, `hours`) |
+| P3 | **Trees and shelters** | Trees / Shelters cells; budget cell (₹, Indian digit grouping) with ₹50,000 · ₹1 lakh · ₹2 lakh · ₹5 lakh cells; plan total when a budget is set; one row per recommendation: stretch, count, cost (est.), shade before → after bar, people a day, sun-minutes saved a day on the stretch; the open row shows the reason, "Try in 3D" and "Evidence"; map shows that row's pins large and the rest small | `/portal/recommendations` (`type`, `budgetInr`) |
+| P4 | **Stretch evidence** | Name, place, length, path pieces, id; four numbers (people a day, % in sun May 10–4, hours a day 90%+ in sun in May, pain rank); 12 months × 24 hours sun grid with May 10 AM–4 PM outlined and a hover read-out; who walks here (nearby places, SunSkip trips, total); a printable line drawing of the stretch with a 50 m scale and north arrow; sources; "Print or save as PDF" (A4 landscape) | `/portal/stretches/{id}` + heat-pain row |
+| P5 | **What-if simulator** | 3D map (pitch 60°, 3D buildings); tools: select and move, add tree, add shelter, reset view; trees are a trunk and three stacked crown discs, shelters four posts and a blue roof, both sized from the request fields; drag to move, click a path to add; side panel: item chips with cost, an editor for the selected item (tree: height, crown radius; shelter: width, length, roof height, turn), "Run simulation"; result: sun-minutes saved a day on paths within 60 m (counts up), shade % before vs after per hour (bars grow), changed paths recolour on the map with a Before / After switch, approximation note | `/portal/simulate` |
+| P6 | **Usage** | Last 7 / 30 / 90 days; trips planned, % that got routes, % that picked a route, average minutes walking in sun; top start points (rounded ~50 m) as a list and as circles on the map; outside-India points labelled | `/portal/stats` |
+
+**States:** loading (shimmer rows), part of the area preparing (banner + progress, list still shows), nothing ready yet (`409`: hourglass, "Getting this area ready", progress), can't reach SunSkip (Try again, filters kept), no plan fits the budget ("The cheapest tree plan here costs ₹…", Clear budget), no trips in the dates.
+
+**Motion:** panel content fades up 10 px on each screen change; hovering a row highlights the stretch and opening a recommendation flies the map to it; entering the simulator tilts the camera into 3D; new trees and shelters grow out of the ground; after Run the paths turn from before to after colours while the hour bars grow and the big number counts up. All of it is off under `prefers-reduced-motion`.
+
+**Words:** "people a day" (always marked estimate), "sun-minutes saved a day", "in sun", "Unnamed path" for OSM paths with no name, ₹ amounts with "est.", never "safe".
 
 ## 13. Assets and credits
 

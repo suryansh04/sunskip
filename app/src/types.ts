@@ -76,12 +76,67 @@ export type Waypoint = {
   cue: string | null;
 };
 
-export type Stretch = {
+// Portal (api.md §8). Unknown is null, never 0.
+export type StretchPain = {
   stretchId: string;
-  name: string;
+  name: string | null;
   lengthM: number;
-  geometry: object;
-  walkersPerDay: number;
-  sunShare: number;
-  painScore: number;
+  sunShare: number | null;
+  walkersPerDay: number | null;
+  walkersEstimated: boolean;
+  painScore: number | null;
+};
+
+export type HeatPain = {
+  shade: Shade;
+  type: "FeatureCollection";
+  features: { type: "Feature"; properties: StretchPain; geometry: { type: "LineString" | "MultiLineString"; coordinates: any[] } }[];
+};
+
+export type ItemType = "TREE" | "SHELTER";
+
+export type Recommendation = {
+  rank: number;
+  type: ItemType;
+  stretchId: string;
+  count: number;
+  positions: LatLng[];
+  impact: { shadePctBefore: number | null; shadePctAfter: number | null; walkersPerDay: number | null; sunMinutesSavedPerDay: number | null };
+  costInr: number;
+  costEstimated: boolean;
+  reason: string;
+};
+
+export type SimItem = {
+  type: ItemType;
+  location: LatLng;
+  heightM: number;
+  crownRadiusM?: number;
+  widthM?: number;
+  lengthM?: number;
+  bearingDeg?: number;
+};
+
+export type Simulation = {
+  byHour: { hour: number; shadePctBefore: number; shadePctAfter: number }[];
+  segments: { id: string; sunFractionBefore: number | null; sunFractionAfter: number | null }[];
+  sunMinutesSavedPerDay: number | null;
+  approximation: boolean;
+};
+
+export type StretchEvidence = {
+  stretchId: string;
+  name: string | null;
+  lengthM: number;
+  segmentIds: string[];
+  sunByMonthHour: (number | null)[][];
+  walkers: { poiEstimate: number | null; appTrips30d: number | null; perDay: number | null };
+};
+
+export type UsageStats = {
+  requests: number;
+  okRequests: number;
+  choiceRate: number | null;
+  avgSunMinutesPerTrip: number | null;
+  topOrigins: { location: LatLng; count: number }[];
 };

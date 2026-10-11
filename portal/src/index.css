@@ -1,0 +1,114 @@
+@import "tailwindcss";
+
+/* Portal design tokens: design.md §12 ("Signal") */
+@theme {
+  --color-ink: #141110;
+  --color-paper: #ffffff;
+  --color-hover: #f4f0eb;
+  --color-muted: #6b5f55;
+  --color-line: #e3dcd3;
+  --color-barline: #3a322c;
+  --color-bartext: #b8ada2;
+  --color-severe: #b91c1c;
+  --color-high: #e8590c;
+  --color-high-text: #c2410c;
+  --color-moderate: #f2994a;
+  --color-moderate-text: #9a4d0e;
+  --color-low: #e9b98b;
+  --color-unknown: #d8d1c7;
+  --color-tree: #3d6a2b;
+  --color-shade: #2f80ed;
+  --color-shade-strong: #1e6fd9;
+  --color-shade-text: #1a5fc4;
+  --color-shade-tint: #e4eefc;
+  --color-sun-tint: #fdebdb;
+
+  --font-sans: "Mona Sans", system-ui, sans-serif;
+  --ease-soft: cubic-bezier(0.2, 0.8, 0.2, 1);
+  --animate-enter: enter 0.34s var(--ease-soft) both;
+  --animate-shimmer: shimmer 1.2s linear infinite;
+  --animate-spin: spin 0.8s linear infinite;
+
+  @keyframes enter {
+    from {
+      opacity: 0;
+      transform: translateY(10px);
+    }
+  }
+  @keyframes shimmer {
+    from {
+      background-position: 200% 0;
+    }
+    to {
+      background-position: -200% 0;
+    }
+  }
+}
+
+/* Condensed headings and big numbers, the sign-board voice of the portal */
+@utility cond {
+  font-stretch: 75%;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.005em;
+}
+@utility num {
+  font-stretch: 75%;
+  font-weight: 800;
+  font-variant-numeric: tabular-nums;
+}
+
+@layer base {
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+  body {
+    min-width: 1200px;
+    background: var(--color-paper);
+    color: var(--color-ink);
+    font-size: 15px;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  button {
+    cursor: pointer;
+  }
+  button:disabled {
+    cursor: default;
+  }
+  :focus-visible {
+    outline: 3px solid var(--color-shade);
+    outline-offset: 2px;
+  }
+  .maplibregl-ctrl-attrib {
+    font-size: 11px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+@media print {
+  @page {
+    size: A4 landscape;
+    margin: 12mm;
+  }
+  html,
+  body,
+  #root {
+    height: auto;
+    min-width: 0;
+  }
+  .print-color {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
