@@ -8,6 +8,7 @@ from uuid import UUID
 
 from app.config import settings
 from app.contracts.models import VoiceStep, Waypoint
+from app.core.formulas import round_whole
 from app.routes.waypoints import compass, trip_waypoints
 from app.voice.audio import speak
 
@@ -24,7 +25,7 @@ class Run:
 
 def said_metres(metres: float) -> int:
     step = LONG_STEP_M if metres >= LONG_FROM_M else SHORT_STEP_M
-    return max(step, round(metres / step) * step)
+    return max(step, round_whole(metres / step) * step)
 
 
 def runs_of(points: list[Waypoint]) -> list[Run]:
