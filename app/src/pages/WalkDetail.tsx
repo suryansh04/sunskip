@@ -100,10 +100,14 @@ export default function WalkDetail() {
   useEffect(() => {
     if (!walk) return;
     const middle = { lat: (walk.from.lat + walk.to.lat) / 2, lng: (walk.from.lng + walk.to.lng) / 2 };
+    let current = true; // the streets of an hour no longer picked are dropped
     api
       .get("/shade/segments", { params: { bbox: bboxAround(middle), month: Number(walk.at.slice(5, 7)), hour } })
-      .then((res) => setStreets(res.data))
-      .catch(() => setStreets(null));
+      .then((res) => current && setStreets(res.data))
+      .catch(() => current && setStreets(null));
+    return () => {
+      current = false;
+    };
   }, [hour]);
 
   // First the line draws itself from start to stop; after that a new hour recolours it piece by piece
