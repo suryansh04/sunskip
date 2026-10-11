@@ -35,21 +35,23 @@ TOOLS = [
         "input_schema": {
             "type": "object",
             "properties": {
-                "destination": PLACE_FIELD,
+                "destination": {
+                    **PLACE_FIELD,
+                    "description": "Where to; leave out for the trip the user is looking at",
+                },
                 "origin": {**PLACE_FIELD, "description": "Where from; leave out to start where the user is"},
                 "leave_at": {"type": "string", "description": "Leave time today, 24-hour HH:MM; leave out for now"},
             },
-            "required": ["destination"],
         },
     },
     {
         "name": "find_best_time",
-        "description": "Minutes walking in direct sun for leaving at each hour today (7 AM to 7 PM), and the best "
-        "hour. Use it for 'when should I leave', 'is it better at 5'.",
+        "description": "Minutes walking in direct sun for leaving at each hour of the day (7 AM to 7 PM), and the "
+        "best hour. Works for hours already past too: the sun follows the same pattern each day. Use it for 'when "
+        "should I leave', 'is it better at 5'. Leave out both places for the trip the user is looking at.",
         "input_schema": {
             "type": "object",
             "properties": {"destination": PLACE_FIELD, "origin": PLACE_FIELD},
-            "required": ["destination"],
         },
     },
     {
@@ -79,6 +81,7 @@ class ToolContext:
     client_hash: str
     location: LatLng | None
     trip_id: UUID | None
+    trip_places: tuple[PlaceInput, PlaceInput] | None = None  # (from, to) of the trip the user is looking at
     summaries: list[str] = field(default_factory=list)  # one sentence per answer, for the template reply
 
 
@@ -106,10 +109,20 @@ def leave_time(text: str | None) -> datetime:
         raise ApiError(400, "INVALID_REQUEST", "leave_at must be HH:MM") from error
 
 
+async def trip_ends(tool_input: dict, context: ToolContext) -> tuple[PlaceInput, PlaceInput]:
+    """The places a tool is about: the ones named, else the trip the user is looking at."""
+    if not tool_input.get("destination"):
+        if context.trip_places is None:
+            raise ApiError(400, "INVALID_REQUEST", "No destination yet; ask where the user is going")
+        return context.trip_places
+    return await place_input(tool_input.get("origin"), context), await place_input(tool_input["destination"], context)
+
+
 async def plan_route(tool_input: dict, context: ToolContext) -> str:
+    origin, destination = await trip_ends(tool_input, context)
     request = PlanRequest(
-        origin=await place_input(tool_input.get("origin"), context),
-        destination=await place_input(tool_input["destination"], context),
+        origin=origin,
+        destination=destination,
         depart_at=leave_time(tool_input.get("leave_at")),
         preference=PREFERENCE,
     )
@@ -120,9 +133,10 @@ async def plan_route(tool_input: dict, context: ToolContext) -> str:
 
 
 async def best_time(tool_input: dict, context: ToolContext) -> str:
+    origin, destination = await trip_ends(tool_input, context)
     request = BestTimeRequest(
-        origin=await place_input(tool_input.get("origin"), context),
-        destination=await place_input(tool_input["destination"], context),
+        origin=origin,
+        destination=destination,
         date=datetime.now(IST).date(),
         from_=DAY_FROM,
         to=DAY_TO,

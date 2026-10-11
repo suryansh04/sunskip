@@ -11,7 +11,7 @@ from app.agent.check import problems_with
 from app.agent.facts import clock, option_line
 from app.agent.tools import TOOLS, ToolContext, run_tool
 from app.config import IST, settings
-from app.contracts.models import AgentChatRequest, AgentChatResponse, RouteOption
+from app.contracts.models import AgentChatRequest, AgentChatResponse, PlanRequest, RouteOption
 from app.core.errors import ApiError
 from app.core.http import track_service
 from app.db.agent_queries import create_session, load_recent_messages, save_messages, session_exists
@@ -29,14 +29,16 @@ _claude: anthropic.AsyncAnthropic | None = None
 
 RULES = """You are SunSkip's assistant. SunSkip helps people in India walk and take buses, metros and e-rickshaws \
 with fewer minutes in direct sun.
-- Answer in English, in under 60 words, plainly and kindly. The answer is translated for the user.
-- The user may write in Hindi, Hinglish or English.
+- The user may write in Hindi, Hinglish or English. Always write your answer in plain English (never Hindi or \
+Hinglish), in under 60 words, plainly and kindly: SunSkip translates it into the user's language.
 - Use only numbers that appear in the tool results or in the trip below. Never estimate or make up a number.
 - Say times like "5 PM". Say minutes like "7.6 min".
 - Never use the word "safe". Give no medical advice.
 - If shade data is still being prepared, say so and suggest when to leave. If there is no shade data, say minutes \
 in sun are unknown there.
-- If you need a destination and don't have one, ask for it."""
+- Any hour of the day can be checked, including hours already past today: the sun follows the same pattern each day.
+- Questions that name no place are about the trip below, if there is one; tools use it when you leave the places out.
+- If you need a destination and don't have one, ask for it. Don't apologise; just answer."""
 
 
 def claude() -> anthropic.AsyncAnthropic:
@@ -54,6 +56,8 @@ async def trip_context(context: ToolContext) -> str:
     if trip is None:
         context.trip_id = None
         return ""
+    request = PlanRequest.model_validate(trip["request"])
+    context.trip_places = (request.origin, request.destination)
     options = [RouteOption.model_validate(option) for option in trip["options"]][:TRIP_OPTIONS_SHOWN]
     context.summaries.append(option_line(options[0]))
     return "\n\nThe trip the user is looking at:\n" + "\n".join(option_line(option) for option in options)
@@ -112,7 +116,7 @@ async def converse(system: str, turns: list[dict], context: ToolContext, questio
     """Claude's checked English reply (None if none could be trusted in time) and the tools it used. `turns` grows
     with the exchange. A rejected reply and its correction are sent once, then dropped, so they're never saved."""
     started, used, retries, rounds, correction = time.monotonic(), [], 0, 0, []
-    sources = [question, *context.summaries]
+    sources = [system, question, *context.summaries]  # the prompt holds the time and the trip
     while time.monotonic() - started < settings.agent_budget_s:
         message = await ask_claude(system, turns + correction)
         if message.stop_reason == "tool_use":

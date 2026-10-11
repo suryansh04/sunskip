@@ -35,7 +35,7 @@ def leg_words(leg: Leg) -> str:
 
 def option_line(option: RouteOption) -> str:
     labels = f" ({', '.join(label.lower() for label in option.labels)})" if option.labels else ""
-    fare = "fare unknown" if option.fare_inr is None else f"fare Rs {option.fare_inr}"
+    fare = "fare unknown" if option.fare_inr is None else f"fare ₹{option.fare_inr}"
     exposure = option.exposure
     return (
         f"Option {option.option_id}{labels}: {', '.join(leg_words(leg) for leg in option.legs)}; "
@@ -94,7 +94,7 @@ def best_time_summary(answer: BestTimeResponse) -> str:
 def conditions_facts(conditions: Conditions) -> str:
     air = "" if conditions.naqi is None else f" Air quality (NAQI) {conditions.naqi}, {conditions.naqi_category}."
     later = "; ".join(f"{clock(hour.at)} feels like {hour.feels_like_c} C" for hour in conditions.hourly[1:7])
-    alert = " Heat alert (feels like 40 C or more)." if conditions.heat_alert else ""
+    alert = " Heat alert (feels like 40 C or more)." if conditions.heat_alert else " No heat alert (below 40 C)."
     return (
         f"At {clock(conditions.at)}: {conditions.temp_c} C, feels like {conditions.feels_like_c} C.{alert}{air} "
         f"Next hours: {later}."

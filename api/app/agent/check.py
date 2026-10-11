@@ -8,6 +8,7 @@ from app.config import settings
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
 THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}\b)")  # "1,200" is one number
 SAFE_WORD = re.compile(r"\bsafe", re.IGNORECASE)
+QUIET = "Reply with the new answer only; don't apologise or mention this note."
 
 
 def numbers_in(text: str) -> list[float]:
@@ -27,9 +28,12 @@ def unbacked_numbers(reply: str, sources: list[str]) -> list[float]:
 def problems_with(reply: str, sources: list[str]) -> str | None:
     """What is wrong with the reply, in words Claude can act on, or None when it can be sent."""
     if SAFE_WORD.search(reply):
-        return "Don't use the word 'safe' (or 'safety'); say how many minutes are in direct sun instead."
+        return "Rewrite the answer without the word 'safe' or 'safety'; give minutes in direct sun instead. " + QUIET
     wrong = unbacked_numbers(reply, sources)
     if wrong:
         listed = ", ".join(f"{number:g}" for number in wrong)
-        return f"These numbers aren't in the tool results: {listed}. Use only numbers from the tool results."
+        return (
+            f"Rewrite the answer: these numbers aren't in the tool results: {listed}. Use only numbers from them. "
+            + QUIET
+        )
     return None

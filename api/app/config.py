@@ -112,7 +112,7 @@ class Settings(BaseSettings):
     agent_max_tool_rounds: int = 4
     agent_max_retries: int = 2
     agent_history_messages: int = 20
-    agent_budget_s: float = 20  # stop asking Claude after this and answer from the numbers
+    agent_budget_s: float = 16  # stop asking Claude after this and answer from the numbers
     agent_max_tokens: int = 400
     agent_number_tolerance: float = 1
     agent_questions_per_device_per_day: int = 30
