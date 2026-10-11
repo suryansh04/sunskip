@@ -90,8 +90,25 @@ class Settings(BaseSettings):
     stop_shaded_below_sun: float = 0.5  # a stop counts as shaded when less than half of it is in sun
     graph_snap_max_m: float = 60
     privacy_grid_deg: float = 0.0005
-    demand_radius_m: float = 400
-    demand_decay_m: float = 150
+    # People a day on each path (api.md §8): trips between nearby places, walked along the shortest path
+    demand_max_walk_m: float = 1200  # longer walks are left out
+    demand_decay_m: float = 400  # a place 400 m further away is e (2.7) times less likely to be walked to
+    demand_snap_m: float = 150  # a place joins the path network at its nearest path within this
+    demand_unmapped_share: float = 0.3  # trips to places OSM doesn't map (homes, parking): spread over the paths
+    demand_assignment_runs: int = 8  # stochastic assignment: runs averaged
+    demand_length_noise: float = 0.15  # each run sees path lengths up to 15% longer or shorter
+    # Walking trip ends a day that each kind of place creates (estimates; sources in api.md §8)
+    trip_ends_per_day: dict[str, float] = {
+        "METRO": 10000,  # Jaipur Metro: 55,068 riders a day (July 2024) / 11 stations, x2 (on and off)
+        "BUS": 1300,  # JCTSL: ~125,000 riders a day / ~193 stops, x2
+        "ERICKSHAW": 300,
+        "HOSTEL": 2600,  # MUJ: 6,500 beds / 10 hostel blocks in OSM = 650 a block, x2 walking round trips
+        "ACADEMIC": 4000,
+        "CAMPUS_GATE": 2000,
+        "FOOD": 200,
+        "SHOP": 100,
+        "OTHER": 50,
+    }
     poll_after_seconds: int = 3
 
     # Voice (Sarvam) and the agent (Claude), api.md §7

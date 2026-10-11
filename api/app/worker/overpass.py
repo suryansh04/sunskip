@@ -45,8 +45,6 @@ out;
 out center;
 """
 
-# Walkers per day each kind of place creates. Guesses, shown as estimates in the portal
-POI_WEIGHTS = {"HOSTEL": 300, "ACADEMIC": 500, "CAMPUS_GATE": 400, "FOOD": 50, "SHOP": 30, "OTHER": 20}
 ACADEMIC_AMENITIES = {"university", "college", "school"}
 FOOD_AMENITIES = {"restaurant", "cafe", "fast_food"}
 
@@ -127,7 +125,7 @@ def poi_row(element: dict) -> tuple:
     point = element.get("center") or element
     kind = poi_kind(element["tags"])
     osm_id = f"{element['type']}/{element['id']}"
-    return osm_id, kind, element["tags"].get("name"), point["lon"], point["lat"], POI_WEIGHTS[kind]
+    return osm_id, kind, element["tags"].get("name"), point["lon"], point["lat"], settings.trip_ends_per_day[kind]
 
 
 class OverpassBusyError(Exception):
