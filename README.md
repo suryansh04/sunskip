@@ -1,6 +1,4 @@
-# <img src="project-images/logo.jpeg" height="44" alt="SunSkip">
-
-**Skip the sun, not the trip.**
+# <img src="project-images/logo.jpeg" height="44" alt="SunSkip" align="middle">&nbsp;&nbsp;<sub>Skip the sun, not the trip.</sub>
 
 ## Introduction
 
