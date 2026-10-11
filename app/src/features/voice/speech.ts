@@ -13,8 +13,10 @@ function speakInBrowser(text, language) {
 export function say(text, language, audioUrl) {
   hush();
   if (!audioUrl) return speakInBrowser(text, language);
-  playing = new Audio(audioUrl);
-  playing.play().catch(() => speakInBrowser(text, language));
+  const audio = new Audio(audioUrl);
+  playing = audio;
+  // Careful: hush() before the audio starts also rejects play(); that clip was stopped on purpose, so don't read it out
+  audio.play().catch(() => playing === audio && speakInBrowser(text, language));
 }
 
 export function hush() {
