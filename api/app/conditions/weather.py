@@ -4,6 +4,7 @@ import httpx
 
 from app.config import IST
 from app.core.errors import ApiError
+from app.core.formulas import heat_weight
 from app.core.http import http_client, track_service
 from app.db.cache_queries import conditions_cell_id, read_conditions_cache, write_conditions_cache
 
@@ -17,6 +18,8 @@ FORECAST_TTL_MIN = 15
 ARCHIVE_TTL_MIN = 30 * 24 * 60
 ONE_YEAR_SAME_WEEKDAY = timedelta(days=364)
 ARCHIVE_START = date(1940, 1, 1)  # Open-Meteo has no older weather
+MONTHS = 12
+HOURS = 24
 SOURCES = {  # cache kind -> (url, source name, cache minutes)
     "WEATHER": (FORECAST_URL, "open-meteo", FORECAST_TTL_MIN),
     "WEATHER_ARCHIVE": (ARCHIVE_URL, "open-meteo-archive", ARCHIVE_TTL_MIN),
@@ -57,18 +60,36 @@ def _to_hour_map(hourly: dict, shift: timedelta) -> HourlyWeather:
     }
 
 
-async def _archive_day(lat: float, lng: float, day: date, shift: timedelta) -> tuple[HourlyWeather, bool]:
+async def _archive(lat: float, lng: float, first: date, last: date, cell_id: str) -> tuple[dict, bool]:
     params = {
         "latitude": lat,
         "longitude": lng,
         "hourly": HOURLY_FIELDS,
         "timezone": "Asia/Kolkata",
-        "start_date": day.isoformat(),
-        "end_date": (day + timedelta(days=1)).isoformat(),
+        "start_date": first.isoformat(),
+        "end_date": last.isoformat(),
     }
+    return await _cached_hourly(cell_id, "WEATHER_ARCHIVE", params)
+
+
+async def _archive_day(lat: float, lng: float, day: date, shift: timedelta) -> tuple[HourlyWeather, bool]:
     cell_id = f"{conditions_cell_id(lat, lng)}@{day.isoformat()}"
-    hourly, stale = await _cached_hourly(cell_id, "WEATHER_ARCHIVE", params)
+    hourly, stale = await _archive(lat, lng, day, day + timedelta(days=1), cell_id)
     return _to_hour_map(hourly, shift), stale
+
+
+async def typical_heat_weights(lat: float, lng: float) -> list[float]:
+    """heatWeight for every month and hour (index (month - 1) * 24 + hour), averaged over last year's days."""
+    year = datetime.now(IST).year - 1
+    cell_id = f"{conditions_cell_id(lat, lng)}@{year}"
+    hourly, _ = await _archive(lat, lng, date(year, 1, 1), date(year, 12, 31), cell_id)
+    sums, days = [0.0] * MONTHS * HOURS, [0] * MONTHS * HOURS
+    for time, feels in zip(hourly["time"], hourly["apparent_temperature"], strict=True):
+        moment = datetime.fromisoformat(time)
+        slot = (moment.month - 1) * HOURS + moment.hour
+        sums[slot] += heat_weight(feels)
+        days[slot] += 1
+    return [total / count if count else heat_weight(None) for total, count in zip(sums, days, strict=True)]
 
 
 def years_back_to_archive(day: date, today: date) -> timedelta:

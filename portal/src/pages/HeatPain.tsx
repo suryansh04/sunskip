@@ -8,7 +8,7 @@ import { BANDS, PAIN_COLOR } from "../bands";
 import { MONTHS, errorMessage, hourLabel, inr } from "../format";
 import { flyTo, midpoint, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
-import MonthPicker, { HOTTEST_MONTH } from "../components/MonthPicker";
+import MonthPicker, { SUMMER_MONTH } from "../components/MonthPicker";
 import PainList from "../components/PainList";
 import SkeletonRows from "../components/SkeletonRows";
 import StateMessage from "../components/StateMessage";
@@ -56,7 +56,7 @@ function downloadCsv(rows, fileName) {
 export default function HeatPain() {
   const { map, area } = useOutletContext<any>();
   const navigate = useNavigate();
-  const [month, setMonth] = useState(HOTTEST_MONTH);
+  const [month, setMonth] = useState(SUMMER_MONTH);
   const [byHour, setByHour] = useState(false);
   const [hour, setHour] = useState(13);
   const [data, setData] = useState(null);
@@ -170,12 +170,14 @@ export default function HeatPain() {
 
   function chooseByHour(on) {
     setByHour(on);
-    if (on) setMonth(HOTTEST_MONTH); // the hour slider is for May, the month the ranking uses
+    if (on) setMonth(SUMMER_MONTH); // the hour slider is for May, the month the ranking uses
   }
 
   const top = rows.slice(0, TAGGED);
   const placeName = area.place.split(",")[0];
-  const when = byHour ? `at ${hourLabel(hour)} in May, the hottest month` : `10 AM – 4 PM in ${MONTHS[month - 1]}${month === HOTTEST_MONTH ? ", the hottest month" : ""}`;
+  const when = byHour ? `at ${hourLabel(hour)} in May` : `10 AM – 4 PM in ${MONTHS[month - 1]}`;
+  const busiest = Math.max(0, ...top.map((row) => row.walkersPerDay || 0));
+  const noHeat = top.length > 0 && top.every((row) => !row.painScore) && top.some((row) => row.sunShare > 0);
   const busy = loading && !data;
   const cellsTotal = progress?.cellsTotal || data?.shade?.cellsTotal;
   const cellsDone = progress?.cellsDone ?? data?.shade?.cellsDone;
@@ -185,11 +187,20 @@ export default function HeatPain() {
       <PanelHead title="Heat pain">
         {rows.length ? (
           <>
-            <b>{inr(top.reduce((sum, row) => sum + (row.walkersPerDay || 0), 0))} people a day</b> walk the {top.length} worst stretches in {placeName}.{" "}
+            {noHeat ? (
+              <>
+                <b>No heat pain</b> in {placeName}, {when}: it is rarely hot then (feels-like under 30 °C). These are the {top.length} busiest paths in the sun.
+              </>
+            ) : (
+              <>
+                The {top.length} worst stretches in {placeName}, {when}.
+              </>
+            )}{" "}
+            The busiest has <b>about {inr(busiest)} people a day</b>.{" "}
             <b>
               {top.filter((row) => row.sunShare >= HOT_SHARE).length} of {top.length}
             </b>{" "}
-            are in direct sun 90%+ of the time, {when}.
+            are 90%+ in direct sun.
           </>
         ) : (
           `The paths in ${placeName} with the most people in full sun.`
@@ -298,13 +309,16 @@ export default function HeatPain() {
       </div>
 
       {/* Sits over the map: the panel has no position of its own, so this is placed in <main> */}
-      <div className="absolute top-5 left-5 z-[3] flex border-2 border-ink bg-white text-[12px] font-bold">
-        {BANDS.slice(0, 4).map((band) => (
-          <span key={band.key} className="flex items-center gap-1.5 px-3 py-2 not-first:border-l not-first:border-line">
-            <i className="size-3.5" style={{ background: band.color }} />
-            {band.legend}
-          </span>
-        ))}
+      <div className="absolute top-5 left-5 z-[3] border-2 border-ink bg-white text-[12px]">
+        <div className="flex font-bold">
+          {BANDS.slice(0, 4).map((band) => (
+            <span key={band.key} className="flex items-center gap-1.5 px-3 py-2 not-first:border-l not-first:border-line">
+              <i className="size-3.5" style={{ background: band.color }} />
+              {band.legend}
+            </span>
+          ))}
+        </div>
+        <p className="border-t border-line px-3 py-1.5 text-muted">Score 100 = the worst stretch here, at its hottest hour of the year</p>
       </div>
     </aside>
   );

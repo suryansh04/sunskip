@@ -36,37 +36,52 @@ async def load_top_origins(start: datetime, end: datetime) -> list[asyncpg.Recor
     )
 
 
-# Pain = walkers x sun share x length, per stretch, scaled so the worst one in the area is 100.
-# Demand is a LEFT JOIN: a fresh area has no estimates until the nightly job runs.
+# Pain = walkers x metres in sun x heat weight, per stretch, averaged over the chosen hours. It is scaled so 100 is
+# the worst stretch in the area at its worst hour of the year: one fixed yardstick, so 6 PM or December score lower
+# than May noon. $9 holds the typical heat weight of each month and hour, at index (month - 1) * 24 + hour + 1.
+# Hours with the sun down have no shade rows and count as no sun. When it is never hot (all scores 0), people x sun
+# still orders the list. Demand is a LEFT JOIN: a fresh area has no
+# estimates until the nightly job runs.
 HEAT_PAIN_SQL = """
 WITH seg AS (
-  SELECT s.stretch_id, s.length_m,
-         COALESCE(d.walkers_per_day, 0) AS walkers, COALESCE(d.app_trips_30d, 0) AS app_trips,
-         COALESCE(avg(sh.sun_fraction) FILTER (WHERE sh.nodata_fraction < 1), 0) AS sun
+  SELECT s.id, s.stretch_id, s.length_m,
+         COALESCE(d.walkers_per_day, 0) AS walkers, COALESCE(d.app_trips_30d, 0) AS app_trips
   FROM segments s
   LEFT JOIN demand_estimates d ON d.segment_id = s.id
-  LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = $5 AND sh.hour BETWEEN $6 AND $7
   WHERE s.shade_ready AND s.stretch_id IS NOT NULL AND s.geom && ST_MakeEnvelope($1, $2, $3, $4, 4326)
-  GROUP BY s.id, d.walkers_per_day, d.app_trips_30d
 ), st AS (
   SELECT stretch_id,
          sum(walkers * length_m) / sum(length_m) AS walkers_per_day,
          sum(app_trips * length_m) / sum(length_m) AS app_trips_30d,
-         sum(sun * length_m) / sum(length_m) AS sun_share,
          sum(length_m) AS length_m
   FROM seg GROUP BY stretch_id
+), hourly AS (
+  SELECT seg.stretch_id, sh.month, sh.hour, sum(sh.sun_fraction * seg.length_m) AS sun_m,
+         sum(sh.sun_fraction * seg.length_m) * ($9::float8[])[(sh.month - 1) * 24 + sh.hour + 1] AS heat_m
+  FROM seg JOIN segment_shade sh ON sh.segment_id = seg.id AND sh.nodata_fraction < 1
+  GROUP BY seg.stretch_id, sh.month, sh.hour
+), picked AS (
+  SELECT stretch_id,
+         sum(sun_m) FILTER (WHERE month = $5 AND hour BETWEEN $6 AND $7) / ($7 - $6 + 1) AS sun_m,
+         sum(heat_m) FILTER (WHERE month = $5 AND hour BETWEEN $6 AND $7) / ($7 - $6 + 1) AS heat_m,
+         max(heat_m) AS worst_heat_m
+  FROM hourly GROUP BY stretch_id
 )
-SELECT st.*, stretches.name, ST_AsGeoJSON(stretches.geom)::json AS geometry,
-       100 * walkers_per_day * sun_share * st.length_m
-         / NULLIF(max(walkers_per_day * sun_share * st.length_m) OVER (), 0) AS pain_score
+SELECT st.*, COALESCE(picked.sun_m, 0) / st.length_m AS sun_share,
+       stretches.name, ST_AsGeoJSON(stretches.geom)::json AS geometry,
+       100 * walkers_per_day * COALESCE(picked.heat_m, 0)
+         / NULLIF(max(walkers_per_day * picked.worst_heat_m) OVER (), 0) AS pain_score
 FROM st JOIN stretches ON stretches.id = st.stretch_id
-ORDER BY pain_score DESC NULLS LAST, st.length_m DESC
+LEFT JOIN picked ON picked.stretch_id = st.stretch_id
+ORDER BY pain_score DESC NULLS LAST, walkers_per_day * COALESCE(picked.sun_m, 0) DESC, st.length_m DESC
 LIMIT $8
 """
 
 
-async def load_heat_pain(bbox: tuple, month: int, hours: tuple[int, int], limit: int) -> list[asyncpg.Record]:
-    return await get_pool().fetch(HEAT_PAIN_SQL, *bbox, month, *hours, limit)
+async def load_heat_pain(
+    bbox: tuple, month: int, hours: tuple[int, int], limit: int, heat_weights: list[float]
+) -> list[asyncpg.Record]:
+    return await get_pool().fetch(HEAT_PAIN_SQL, *bbox, month, *hours, limit, heat_weights)
 
 
 async def load_stretch(stretch_id: int) -> asyncpg.Record | None:

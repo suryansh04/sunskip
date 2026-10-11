@@ -16,7 +16,7 @@ export default function PainList({ rows, hover, onHover, onOpen }) {
           >
             <b className="cond text-[17px] tracking-[0.01em]">{band.name}</b>
             <span className="text-[12.5px] font-semibold">
-              {band.rows.length} {band.rows.length === 1 ? "stretch" : "stretches"} · {inr(band.rows.reduce((sum, row) => sum + (row.walkersPerDay || 0), 0))} people a day
+              {band.rows.length} {band.rows.length === 1 ? "stretch" : "stretches"}
             </span>
           </div>
           {band.rows.map((row) => (
@@ -50,8 +50,8 @@ export default function PainList({ rows, hover, onHover, onOpen }) {
         </section>
       ))}
       <p className="px-6.5 pt-4 pb-6 text-[13px] leading-normal text-muted">
-        <b className="text-ink">Pain</b> = people a day × share of the path in direct sun × length, scaled so the worst stretch in this area is 100. People a day are estimates from nearby colleges, stops and
-        shops, plus SunSkip trips.
+        <b className="text-ink">Pain</b> = people a day × length in direct sun × how hot those hours usually are (feels-like from last year's weather; under 30 °C counts as no heat). It is scaled so 100 is the
+        worst stretch in this area at its hottest hour of the year, so months and hours compare fairly. People a day are estimates from nearby colleges, stops and shops, plus SunSkip trips.
       </p>
     </div>
   );

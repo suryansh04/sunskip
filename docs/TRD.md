@@ -179,7 +179,7 @@ export default function MapView({ center, geojson, colorBy }) {
 ```
 
 - **Sun colours:** `["interpolate", ["linear"], ["get", "sunFraction"], 0, "#2F80ED", 1, "#F2994A"]` (blue = shade, orange = sun).
-- **Pain colours:** `["interpolate", ["linear"], ["get", "painScore"], 0, "#FDE68A", 100, "#B91C1C"]`.
+- **Pain colours:** stepped bands on the fixed pain scale (api.md §8): Low `#E9B98B`, Moderate 20+ `#F2994A`, High 40+ `#E8590C`, Severe 70+ `#B91C1C`, unknown `#D8D1C7` (`portal/src/bands.ts`).
 - **Map tiles:** OpenFreeMap is free and needs no key. Keep the OpenStreetMap attribution visible (the style includes it). It is a public service with no uptime promise, so keep the URL in an env var so we can swap it.
 
 ### 2.5 Polling a shade job (the only "advanced" pattern)
