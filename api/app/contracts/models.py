@@ -279,3 +279,22 @@ class SttResponse(ApiModel):
     transcript: str
     language: str
     english: str
+
+
+class AgentChatRequest(ApiModel):
+    session_id: UUID | None = None
+    message: str = Field(min_length=1, max_length=500)
+    language: Language = "hi-IN"
+    location: LatLng | None = None
+    trip_id: UUID | None = None
+    speak: bool = False
+
+
+class AgentChatResponse(ApiModel):
+    session_id: UUID
+    reply: str
+    reply_language: Language
+    english_reply: str
+    tools_used: list[str]
+    audio_url: str | None
+    fallback: bool

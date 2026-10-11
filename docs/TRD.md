@@ -412,7 +412,7 @@ We use **Cognito's hosted login page** with a redirect and the **authorization c
 | DB              | `asyncpg` with plain SQL; migrations are `.sql` files (no ORM)        |
 | Geo             | `networkx`, `numpy`, `rasterio`, `shapely`, `pyproj`, `pvlib`         |
 | Outside calls   | `httpx` (Google, Open-Meteo, Overpass), `boto3` (S3, Secrets Manager) |
-| AI / voice (P2) | `anthropic`, `sarvamai`                                               |
+| AI / voice      | `anthropic` (Claude); Sarvam over plain `httpx`, `python-multipart` (voice uploads) |
 | Lint            | `ruff`, type hints included (no test files; we test manually, see `CLAUDE.md`) |
 
 **Python version:** 3.12.
@@ -453,16 +453,16 @@ api/
 
 ## 6. AI and voice (Person 2)
 
-- **Claude:** `anthropic` SDK, Messages API with tools.
-  - Model from `CLAUDE_MODEL`.
-  - Max 4 tool rounds.
-  - Number check + template fallback (`api.md` endpoint 9).
-- **Sarvam:** `sarvamai` SDK.
-  - STT: clips under 30 s (WebM, MP4, WAV). `/voice/stt` makes 2 calls: STT (`mode: transcribe`), then translate to English.
-  - Translate.
-  - Bulbul TTS.
-  - Model names come from env vars.
-- **Audio cache:** S3 key `audio/{sha256(text|language|voice)}.mp3`, returned as a presigned URL (1 h).
+- **Claude:** `anthropic` SDK (`AsyncAnthropic`, 10 s timeout, one retry), Messages API with tools, in `api/app/agent/`.
+  - Model from `CLAUDE_MODEL` (`claude-sonnet-5-5`); it reads Hindi and Hinglish as typed and answers in English.
+  - Max 4 tool rounds within 20 s; tools return short text (`agent/facts.py`).
+  - Number check + template fallback (`agent/check.py`, `api.md` endpoint 9).
+- **Sarvam:** plain HTTP through the shared `httpx` client (`api/app/voice/sarvam.py`), header `api-subscription-key`, recorded as `sarvam` in `/health`.
+  - STT `saaras:v3` (`mode: transcribe`, language detected): clips under 30 s (WebM, MP4, WAV). `/voice/stt` then translates to English.
+  - Translate `mayura:v1`, digits kept as 0–9.
+  - TTS `bulbul:v3`, voice `priya`, MP3.
+- **Audio cache:** S3 `audio/{sha256(text|language|voice|source)}.mp3` plus the spoken words in `.txt`, returned as a presigned URL (1 h). Made once per sentence.
+- **Caps:** daily counts per device and in total, kept in memory (`core/caps.py`; one api process), `429` when used up.
 - **Front end:** `features/agent/ChatPanel.tsx`, `features/voice/MicButton.tsx`, `features/voice/Player.tsx`, using the same code rules as §2.
 - **Fallbacks:** browser `speechSynthesis` when `audioUrl` is null; a template answer when Claude fails.
 
@@ -528,7 +528,7 @@ shapely
 pyproj
 pvlib==0.16.1
 anthropic==1.12.1
-sarvamai==0.1.36
+python-multipart==0.0.32
 ruff
 ```
 
