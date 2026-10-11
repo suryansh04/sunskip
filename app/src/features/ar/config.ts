@@ -35,6 +35,9 @@ export const GPS_MIN_MOVE_M = 1
 /** GPS accuracy worse than this, for this long, swaps the 3D arrows for the 2D compass arrow. */
 export const GPS_GATE_ACCURACY_M = 15
 export const GPS_GATE_SECONDS = 5
+/** The 3D arrows only come back after accuracy has been this good for this long, so the view doesn't flip. */
+export const GPS_GATE_EXIT_ACCURACY_M = 12
+export const GPS_GATE_EXIT_SECONDS = 2
 /** The HUD dot is green at or below this accuracy, amber up to the gate, red beyond it. */
 export const GPS_GOOD_ACCURACY_M = 8
 
@@ -44,12 +47,31 @@ export const SNAP_MAX_OFFSET_M = 25
 export const SNAP_SEARCH_BACK_M = 30
 export const SNAP_SEARCH_AHEAD_M = 80
 
+// --- Position -----------------------------------------------------------------------------------
+
+/** The camera glides to each new fix over about this long instead of jumping there. */
+export const POSITION_GLIDE_S = 0.5
+/** A move longer than this (the first good fix after a bad one, a new route) is a jump, not a glide. */
+export const POSITION_JUMP_M = 20
+
 // --- Heading ------------------------------------------------------------------------------------
+
+/**
+ * The heading is where the camera looks. Only with the phone nearly flat (the camera looking this
+ * steeply up or down: 0.9 is 64 degrees, 0.98 is 79) does it blend over to where the top edge points.
+ */
+export const HEADING_FLAT_FROM = 0.9
+export const HEADING_FLAT_FULL = 0.98
+/** Time constant of the running average of the heading (averaged as a direction, so 359 and 1 give 0). */
+export const HEADING_SMOOTHING_S = 0.1
+/** The shown heading stays put until the average is this far from it, then follows until it is this close. */
+export const HEADING_DEADBAND_DEG = 2.5
+export const HEADING_SETTLE_DEG = 0.5
+/** The shown heading never turns faster than this, so a compass glitch can't swing the arrows. */
+export const HEADING_MAX_TURN_DEG_PER_S = 180
 
 /** The 2D compass arrow points at the route this far ahead of the walker. */
 export const COMPASS_LOOKAHEAD_M = 20
-/** Time constant of the low-pass on the heading that drives the 2D compass arrow. */
-export const HUD_HEADING_SMOOTHING_S = 0.25
 /** A route bend at least this sharp counts as a turn: HUD, vibration and the re-align prompt. */
 export const TURN_MIN_DEG = 45
 /** The re-align prompt goes away by itself this far past the turn. */
