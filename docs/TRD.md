@@ -445,7 +445,7 @@ api/
   - never logs keys or request bodies.
 - **Fakes:** with `USE_FAKES=true`, the `contracts/` fakes return the real Bus 26 numbers (810 m, 11.3 / 7.4 min).
 - **Middleware order:** request id → origin secret → client hash. No rate limiter in v1 (API Gateway throttles at 50 req/s).
-- **One api process:** uvicorn runs with `--workers 1`, because the cleanup task must run once. Run the NetworkX route search with `await asyncio.to_thread(...)` so a slow search never blocks other requests.
+- **One api process:** uvicorn runs with `--workers 1`, because the cleanup task must run once, and `--timeout-keep-alive 75`: with the default 5 s, API Gateway sometimes sent a request down a connection uvicorn was closing and POSTs failed with 503. Run the NetworkX route search with `await asyncio.to_thread(...)` so a slow search never blocks other requests.
 - **Worker:** the same Docker image, started with `python -m app.worker`. It needs no HTTP server. It writes a heartbeat to `service_status` every 30 s and runs the demand job once a night.
 - **Migrations:** plain SQL files in `api/migrations/`, applied in name order by `python -m scripts.migrate` (it records applied files in `schema_migrations`).
 
@@ -543,7 +543,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 COPY . .
 EXPOSE 8000
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1"]
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000", "--workers", "1", "--timeout-keep-alive", "75"]
 ```
 
 **`docker-compose.yml`** (`docker compose config` passes)
