@@ -1,5 +1,6 @@
 from datetime import date, datetime
 from typing import Literal
+from uuid import UUID
 
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 from pydantic.alias_generators import to_camel
@@ -242,3 +243,39 @@ class SimulateRequest(ApiModel):
         if 0 <= self.hours[0] <= self.hours[1] <= 23:
             return self
         raise ValueError("hours must be [from, to] with 0 <= from <= to <= 23")
+
+
+Language = Literal["en-IN", "hi-IN"]
+
+
+class VoiceInstructionsRequest(ApiModel):
+    trip_id: UUID
+    option_id: str
+    language: Language = "hi-IN"
+
+
+class VoiceStep(ApiModel):
+    index: int
+    trigger_at_meters: float
+    text: str
+    audio_url: str | None
+
+
+class VoiceInstructionsResponse(ApiModel):
+    steps: list[VoiceStep]
+
+
+class TtsRequest(ApiModel):
+    text: str = Field(min_length=1)
+    language: Language = "hi-IN"
+
+
+class TtsResponse(ApiModel):
+    audio_url: str | None
+    cached: bool
+
+
+class SttResponse(ApiModel):
+    transcript: str
+    language: str
+    english: str
