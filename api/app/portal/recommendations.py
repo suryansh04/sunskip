@@ -8,7 +8,7 @@ import asyncpg
 from app.config import settings
 from app.contracts.ids import stretch_code
 from app.contracts.models import MAX_SIMULATED_ITEMS, LatLng, SimulatedItem
-from app.core.formulas import round_whole
+from app.core.formulas import hour_label, round_whole
 from app.core.geo import Point, haversine_m, line_length_m, sample_line
 from app.db.portal_queries import load_stops_near_stretches, load_stretch_segments
 from app.portal.reports import ready_pain_rows
@@ -16,6 +16,7 @@ from app.portal.simulate import SegmentResult, minutes_saved_per_day, simulate
 from app.shade.bbox import BBox
 
 TOP_STRETCHES = 20
+AREA_STRETCHES = 200  # every stretch in a portal-sized area, to pick the candidates from
 
 
 def spread_out(points: list[Point], spacing_m: float) -> list[Point]:
@@ -71,8 +72,8 @@ def stretch_shade_pct(segments: list[SegmentResult], after: bool) -> int | None:
 def reason(row: asyncpg.Record, month: int, hours: tuple[int, int]) -> str:
     return (
         f"{round_whole(row['length_m'])} m in {round_whole(100 * row['sun_share'])}% sun "
-        f"from {hours[0]}:00 to {hours[1]}:00 in {calendar.month_name[month]}, "
-        f"used by about {round_whole(row['walkers_per_day'])} people a day."
+        f"from {hour_label(hours[0])} to {hour_label(hours[1])} in {calendar.month_name[month]}, "
+        f"used by about {round_whole(row['walkers_per_day']):,} people a day (estimate)."
     )
 
 
@@ -128,8 +129,22 @@ def within_budget(candidates: list[dict], budget_inr: int | None) -> list[dict]:
     return chosen
 
 
+def candidate_rows(rows: list[asyncpg.Record]) -> list[asyncpg.Record]:
+    """Half the most painful stretches, half the ones with the most people in sun per metre. Ranking is per rupee and
+    a row of trees costs by the metre, so a short busy path can beat a long one: picking by pain alone (which grows
+    with length) dropped those in some months."""
+    by_density = sorted(rows, key=lambda row: row["walkers_per_day"] * row["sun_share"], reverse=True)
+    picked = {row["stretch_id"]: row for row in rows[: TOP_STRETCHES // 2]}
+    for row in by_density:
+        if len(picked) >= TOP_STRETCHES:
+            break
+        picked.setdefault(row["stretch_id"], row)
+    return list(picked.values())
+
+
 async def recommend(box: BBox, kind: str, budget_inr: int | None, month: int, hours: tuple[int, int]) -> dict:
-    rows, _ = await ready_pain_rows(box, month, hours, TOP_STRETCHES)
+    rows, _ = await ready_pain_rows(box, month, hours, AREA_STRETCHES)
+    rows = candidate_rows(rows)
     stretch_ids = [row["stretch_id"] for row in rows]
     segments = await stretch_segments(stretch_ids)
     stops = {}

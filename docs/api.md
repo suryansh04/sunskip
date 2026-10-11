@@ -675,11 +675,11 @@ painScore     = 100 × walkersPerDay × heatSunMetres ÷ (the area's worst stret
 
 - **Real:** 0% shade, exposed 9 AM to 4 PM in May.
 - **How:**
-  - Take the top 20 stretches.
+  - Take 20 candidate stretches: the 10 with the highest pain score, then the ones with the most people in sun per metre (walkers × sun share). Ranking is per rupee and trees cost by the metre, so a short, busy path must be in the running; picking by pain alone (which grows with length) dropped those in some months.
   - Trees: every 8 m along the stretch (6 m tall, 3 m crown). A stretch that would need more than 50 (the simulator's limit) gets 50, spaced evenly over its whole length. Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
   - Simulate each (endpoint 16) and count only the sun saved on that stretch.
-  - Pick the best by walkers × minutes saved ÷ cost.
-- Costs (₹2,000 per neem planted with a guard and three years of care, ₹7.5 lakh per powder-coated steel shelter) are estimates from Indian public figures; the sources are in design.md §12. `reason` is a template, not an LLM.
+  - Rank by sun-minutes saved a day (people × minutes) ÷ cost. The top pick can change with the month: the sun's angle moves where shadows fall.
+- Costs (₹2,000 per neem planted with a guard and three years of care, ₹7.5 lakh per powder-coated steel shelter) are estimates from Indian public figures; the sources are in design.md §12. `reason` is a template, not an LLM ("57 m in 100% sun from 10 AM to 4 PM in May, used by about 1,821 people a day (estimate).").
 
 ### 16. `POST /portal/simulate`
 
