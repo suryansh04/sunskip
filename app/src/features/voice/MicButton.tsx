@@ -13,6 +13,10 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
   const recorder = useRef(null);
   const clipTimer = useRef(null);
   const closed = useRef(false);
+  // The host's newest callbacks: a clip is sent long after it started, and the question must go with the
+  // chat's language and conversation as they are then, not as they were when the mic was tapped
+  const host = useRef(null);
+  host.current = { onTranscript, onListening, onError };
 
   useEffect(() => {
     closed.current = false;
@@ -28,7 +32,7 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
   }, []);
 
   function start() {
-    if (!navigator.mediaDevices || !window.MediaRecorder) return onError("This browser can't record. Type your question instead.");
+    if (!navigator.mediaDevices || !window.MediaRecorder) return host.current.onError("This browser can't record. Type your question instead.");
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
@@ -48,9 +52,9 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
         recorder.current.start();
         clipTimer.current = setTimeout(stop, MAX_CLIP_MS);
         setListening(true);
-        onListening(true);
+        host.current.onListening(true);
       })
-      .catch(() => onError("The microphone isn't available. Allow it for this site, or type your question."));
+      .catch(() => host.current.onError("The microphone isn't available. Allow it for this site, or type your question."));
   }
 
   function stop() {
@@ -65,13 +69,13 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
       .then((res) => {
         if (closed.current) return; // the chat was closed while the clip was being heard: ask nothing
         // Silence (or noise) comes back as an empty transcript: there is no question to send
-        if (res.data.transcript.trim()) onTranscript({ ...res.data, seconds });
-        else onError("SunSkip didn't hear a question. Tap the mic and try again, or type it.");
+        if (res.data.transcript.trim()) host.current.onTranscript({ ...res.data, seconds });
+        else host.current.onError("SunSkip didn't hear a question. Tap the mic and try again, or type it.");
       })
-      .catch((err) => onError(err.response?.status === LIMIT_REACHED ? "Voice questions are used up for today. Type your question instead." : "SunSkip couldn't hear that. Try again, or type your question."))
+      .catch((err) => host.current.onError(err.response?.status === LIMIT_REACHED ? "Voice questions are used up for today. Type your question instead." : "SunSkip couldn't hear that. Try again, or type your question."))
       .finally(() => {
         setListening(false);
-        onListening(false);
+        host.current.onListening(false);
       });
   }
 
