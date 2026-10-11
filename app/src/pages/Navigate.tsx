@@ -107,9 +107,10 @@ export default function Navigate() {
   useEffect(() => {
     setLines(points.length > 1 ? walkPieces(points) : null);
     if (points.length < 2) return;
-    const nowIso = istIso(now());
+    // The streets show the sun for the same time as the walk's line: the later start, if one was picked
+    const shownAt = leaveAt || istIso(now());
     api
-      .get("/shade/segments", { params: { bbox: bboxAround(points[Math.floor(points.length / 2)].location), month: Number(nowIso.slice(5, 7)), hour: hourOf(nowIso) } })
+      .get("/shade/segments", { params: { bbox: bboxAround(points[Math.floor(points.length / 2)].location), month: Number(shownAt.slice(5, 7)), hour: hourOf(shownAt) } })
       .then((res) => setStreets(res.data))
       .catch(() => setStreets(null));
   }, [legKey]);
