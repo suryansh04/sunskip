@@ -26,7 +26,7 @@ At 1 PM the entire walk is in the sun. Leaving at 5 PM cuts this to 7.6 minutes,
 - Recommends the best hour to leave, from 7 AM to 7 PM.
 - Shows a shade map for any hour, with feels-like temperature, air quality and a heat alert at 40 °C.
 - Provides turn-by-turn navigation with rerouting, plus an AR view that draws arrows on the path through the camera: blue in shade, orange in sun.
-- Answers trip questions by text or voice in Hindi or English, and speaks walking directions in Hindi.
+- Answers trip questions by text or voice in English, Hindi or Hinglish, and speaks walking directions in Hindi.
 - Installs to the home screen as a PWA.
 
 **Officials portal**
@@ -53,7 +53,7 @@ At 1 PM the entire walk is in the sun. Leaving at 5 PM cuts this to 7.6 minutes,
     <td align="center" valign="top" width="20%"><img src="project-images/app-routes.jpg" width="170" alt="Route options screen: a list of routes, each with its minutes walking in sun, total time, fare and the bus, metro and e-rickshaw steps"><br><em>Routes ranked by minutes in sun</em></td>
     <td align="center" valign="top" width="20%"><img src="project-images/app-walk.jpg" width="170" alt="Walk detail screen: 11.3 minutes in direct sun for the walk to the Bus 26 stop, a sun and shade strip, and bars showing fewer sun minutes at later hours"><br><em>Walk detail and best time to leave</em></td>
     <td align="center" valign="top" width="20%"><img src="project-images/ar-phone.jpeg" width="170" alt="AR view on a phone: chevron arrows drawn on a campus road through the camera, with a label showing sun for the next 45 m"><br><em>AR view: arrows on the path, blue in shade, orange in sun</em></td>
-    <td align="center" valign="top" width="20%"><img src="project-images/app-ask-hindi.jpg" width="170" alt="Ask SunSkip chat: a question in Hindi about leaving at 6 PM, answered in Hindi with the English line below it"><br><em>Ask SunSkip in Hindi</em></td>
+    <td align="center" valign="top" width="20%"><img src="project-images/app-ask-hindi.jpg" width="170" alt="Ask SunSkip chat, which takes questions in English, Hindi or Hinglish: here a Hindi question about leaving at 6 PM, answered in Hindi with the English line below it"><br><em>Ask SunSkip in English, Hindi or Hinglish</em></td>
   </tr>
 </table>
 
