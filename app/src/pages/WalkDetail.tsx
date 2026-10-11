@@ -147,7 +147,7 @@ export default function WalkDetail() {
   // Other hours take the walk's sun minutes from the bars (/routes/best-time); unknown if the bars don't have it
   const sunMinutes = atStart ? (option?.exposure.sunMinutes ?? null) : (slots.find((slot) => hourOf(slot.departAt) === hour)?.sunMinutes ?? null);
   const feels = planned?.conditions.feelsLikeC;
-  const isNow = hour === hourOf(istIso(now()));
+  const isNow = departAt.slice(0, 13) === istIso(now()).slice(0, 13); // same day and hour, e.g. "2026-05-15T13"
   const bits = (points || []).map((point) => sunBit(point.inSun));
   const coords = (points || []).map((point) => [point.location.lng, point.location.lat]);
   const comparable = slots.length > 1 && slots.every((slot) => slot.sunMinutes !== null);
