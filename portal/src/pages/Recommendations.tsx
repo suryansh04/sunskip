@@ -4,7 +4,7 @@ import { ArrowsClockwise, CurrencyInr, HourglassMedium, Tree, Umbrella, WifiSlas
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { PAIN_COLOR } from "../bands";
-import { MONTHS, errorMessage, inr, shortInr } from "../format";
+import { MONTHS, errorMessage, inr, shortInr, stretchName } from "../format";
 import { COST_SOURCES } from "../costs";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
@@ -87,7 +87,7 @@ export default function Recommendations() {
 
   const plan = withinBudget(recs || [], budget);
   const open = plan[openIndex];
-  const nameOf = (stretchId) => stretches[stretchId]?.properties.name || "Unnamed path";
+  const nameOf = (stretchId) => stretchName(stretches[stretchId]?.properties);
 
   // Pins for every place in the plan (the open one large), and the stretches they shade
   useEffect(() => {

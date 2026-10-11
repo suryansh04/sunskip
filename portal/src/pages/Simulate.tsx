@@ -5,7 +5,7 @@ import { api } from "../api/client";
 import { PAIN_COLOR } from "../bands";
 import { COST_SOURCES, DEFAULT_SHELTER, DEFAULT_TREE, itemCost } from "../costs";
 import { asRequest, boxAround, itemsFor, newItem } from "../simItems";
-import { MONTHS, errorMessage, inr, reducedMotion } from "../format";
+import { MONTHS, errorMessage, inr, reducedMotion, stretchName } from "../format";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import { footprint, itemBlocks } from "../shapes";
 import PanelHead from "../components/PanelHead";
@@ -61,7 +61,7 @@ export default function Simulate() {
         const chosen = given || all.find((candidate) => candidate.stretchId === start.stretchId) || all[0] || null;
         setRec(chosen);
         setItems(chosen ? itemsFor(chosen) : []);
-        setName(chosen ? stretches[chosen.stretchId]?.properties.name || "Unnamed path" : "");
+        setName(chosen ? stretchName(stretches[chosen.stretchId]?.properties) : "");
         setStretchLine(chosen ? stretches[chosen.stretchId]?.geometry || null : null);
         setSel(null);
         setResult(null);

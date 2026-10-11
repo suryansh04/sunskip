@@ -80,6 +80,11 @@ class Settings(BaseSettings):
     min_sun_elevation_deg: float = 5
     max_segment_m: float = 50
     stretch_sun_diff: float = 0.2
+    # Labels for stretches with no OSM name ("Footpath by B1 Block"): how far to look for a name
+    label_place_m: float = 60  # a named place this close: "by"
+    label_join_m: float = 15  # a named road this close is the one it joins: "off"
+    label_road_m: float = 60  # a named road this close: "near"
+    label_area_m: float = 300  # else a named place this close: "near"
     shade_sample_spacing_m: float = 5
     stop_match_m: float = 30
     stop_shaded_below_sun: float = 0.5  # a stop counts as shaded when less than half of it is in sun

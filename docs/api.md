@@ -623,6 +623,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
       "properties": {
         "stretchId": "str_007",
         "name": "GHS footpath",
+        "label": null,
         "lengthM": 430,
         "sunShare": 1.0,
         "walkersPerDay": 1200,
@@ -636,6 +637,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Real:** the ~430 m GHS footpath stretch.
 - **`walkersEstimated`** is true while app trips are less than half of the estimate.
+- **`label`** describes a stretch that has no `name` in OpenStreetMap, from the OSM places and roads around it, in this order: a named place within `LABEL_PLACE_M` ("Footpath by B2 block"), the named road it joins within `LABEL_JOIN_M` ("Lane off GHS Hostel Main Road"), a named road within `LABEL_ROAD_M`, a named place within `LABEL_AREA_M` ("… near …"). Footpaths try the place first, streets and lanes the road. Only the part of a name before its first comma is used. `null` when the stretch has a `name`, or nothing named is near. It is a description, not an official name.
 
 ### 15. `GET /portal/recommendations?bbox=&type=TREE|SHELTER&budgetInr=`
 
@@ -726,6 +728,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 {
   "stretchId": "str_007",
   "name": "GHS footpath",
+  "label": null,
   "lengthM": 430,
   "segmentIds": ["seg_412", "seg_413"],
   "sunByMonthHour": [
@@ -855,6 +858,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `MAX_PORTAL_BBOX_KM2`, `SIMULATION_REACH_M`                                                          | 25, 60                                    |
 | `TREE_HEIGHT_M`, `TREE_CROWN_RADIUS_M`, `SHELTER_WIDTH_M`, `SHELTER_LENGTH_M`, `SHELTER_HEIGHT_M`    | 6, 3, 3, 6, 3                             |
 | `STRETCH_SUN_DIFF`, `DEMAND_RADIUS_M`, `DEMAND_DECAY_M`                                              | 0.2, 400, 150                             |
+| `LABEL_PLACE_M`, `LABEL_JOIN_M`, `LABEL_ROAD_M`, `LABEL_AREA_M`                                      | 60, 15, 60, 300                           |
 
 More settings for the database and worker are in `schema.md` §8.
 

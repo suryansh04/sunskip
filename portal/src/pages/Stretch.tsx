@@ -3,7 +3,7 @@ import { useLocation, useNavigate, useOutletContext, useParams } from "react-rou
 import { ArrowLeft, ArrowsClockwise, Cube, MagnifyingGlass, Printer, WifiSlash } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import { bandOf } from "../bands";
-import { errorMessage, inr, pct } from "../format";
+import { LABEL_NOTE, errorMessage, inr, pct, stretchName } from "../format";
 import { flatCoords } from "../map";
 import StateMessage from "../components/StateMessage";
 import SunGrid from "../components/SunGrid";
@@ -151,10 +151,11 @@ export default function Stretch() {
         </div>
 
         <div className="border-t-2 border-ink pt-4">
-          <h1 className="cond text-[84px] leading-[0.86] print:text-[60px]">{evidence.name || "Unnamed path"}</h1>
+          <h1 className="cond text-[84px] leading-[0.86] print:text-[60px]">{stretchName(evidence)}</h1>
           <p className="mt-2.5 text-muted">
             {area.place} · {inr(evidence.lengthM)} m · {evidence.segmentIds.length} path pieces · {evidence.stretchId}
           </p>
+          {!evidence.name && evidence.label && <p className="mt-1 text-[13px] text-muted">{LABEL_NOTE}</p>}
         </div>
 
         <div className="mt-5.5 grid grid-cols-4 border-y-2 border-ink break-inside-avoid">
