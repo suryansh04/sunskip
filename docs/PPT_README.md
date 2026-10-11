@@ -588,12 +588,14 @@ Desktop-first (1280 px+). A black top bar with four sections (**Heat pain, Trees
 - **Amazon Cognito** hosted login with the **authorization code + PKCE** flow, written by hand (~150 lines, no auth library).
 - Tokens renew a minute before they expire using the **30-day refresh token**, so officials stay signed in.
 - **"Sign in as demo user"** button for judges signs in directly through Cognito's user-pool API (`USER_PASSWORD_AUTH`).
+- **The map behind sign-in** is a real capture of the MUJ heat pain. The path its caption describes (GHs Footpath, about 1,296 people a day, 96% in sun 10 AM – 4 PM in May) is outlined and tagged "This path".
 - API Gateway checks the Cognito token on every `/portal/*` call; FastAPI never sees an unsigned portal request.
 
 ### 11.2 Heat pain (`/`)
-- Ranks **stretches by pain score**: how many people walk them, how much of the time they're in sun, and how long they are. The worst in the area is 100.
-- **Bands:** Severe 70+ (deep red), High 40–69, Moderate 20–39, Low, Unknown. Lines on the map are coloured and **thicker for worse pain**; the top 10 get **rank tags** on the map (overlapping tags are spread out).
-- **Month picker** on every screen (May by default, labelled "**the hottest month**").
+- Ranks **stretches by pain score**: how many people walk them, how much of the path is in sun, and how hot those hours usually are (feels-like from last year's weather). 100 is the area's worst stretch at its hottest hour of the year, one fixed scale, so 6 PM or December score lower than May noon.
+- **Headline:** the 10 worst stretches, the busiest one's people a day (never a sum, which would count one person many times), and how many are 90%+ in sun. When it's never hot (December), it says there's no heat pain.
+- **Bands:** Severe 70+ (deep red), High 40–69, Moderate 20–39, Low, Unknown. Band headers show how many stretches are in each band. Lines on the map are coloured and **thicker for worse pain**; the top 10 get **rank tags** on the map (overlapping tags are spread out).
+- **Month picker** on every screen (May by default, labelled "**peak summer**").
 - **Hours:** 10 AM – 4 PM, or **"By hour"** with a slider (7 AM – 6 PM).
 - **CSV export** of the list.
 - Hover the list or map to highlight; click to open the stretch evidence.
@@ -686,7 +688,9 @@ Walkers per day on a path piece (demand estimate, nightly)
     + app trips that used it in the last 30 days ÷ 30
 
 Pain score of a stretch
-    100 × walkers per day × sun share × length ÷ (highest value in the area)
+    100 × walkers per day × Σ (length × sun fraction × typical heat weight) over the chosen hours
+        ÷ (the area's worst stretch at its hottest month and hour)
+    typical heat weight = heatWeight(feels-like) averaged over last year's days for that month and hour
 
 Simulator shadow
     sun position from pvlib (day 15 of the month, each hour, sun ≥ 5° up)

@@ -1,14 +1,16 @@
 """Read-only portal views: usage stats, the heat-pain ranking and one stretch's evidence (api.md 13, 14, 17)."""
 
+import logging
 from datetime import date, datetime, timedelta
 
 import asyncpg
 
+from app.conditions.weather import typical_heat_weights
 from app.config import IST
 from app.contracts.ids import segment_code, stretch_code, stretch_number
 from app.contracts.models import Shade
 from app.core.errors import ApiError
-from app.core.formulas import round_half_up, round_whole
+from app.core.formulas import heat_weight, round_half_up, round_whole
 from app.db.demand_queries import APP_TRIPS_DAYS
 from app.db.portal_queries import load_heat_pain, load_stats, load_stretch, load_stretch_sun, load_top_origins
 from app.portal.labels import stretch_labels
@@ -20,6 +22,8 @@ DEFAULT_STATS_DAYS = 30
 ESTIMATED_BELOW_SHARE = 0.5  # walkers are "estimated" while app trips are under half of the estimate
 MONTHS = 12
 COORD_DECIMALS = 6
+
+logger = logging.getLogger(__name__)
 
 
 def origin_entry(row: asyncpg.Record) -> dict:
@@ -65,10 +69,20 @@ def pain_feature(row: asyncpg.Record, label: str | None) -> dict:
     }
 
 
+async def area_heat_weights(box: BBox) -> list[float]:
+    """How hot each month and hour typically is at the area's centre. Unknown weather weighs 1 (api.md §8)."""
+    west, south, east, north = box
+    try:
+        return await typical_heat_weights((south + north) / 2, (west + east) / 2)
+    except ApiError:
+        logger.warning("No typical weather for the heat-pain area; every hour weighs the same")
+        return [heat_weight(None)] * MONTHS * HOURS
+
+
 async def ready_pain_rows(box: BBox, month: int, hours: tuple[int, int], limit: int) -> tuple[list, Shade]:
     """Ranked stretches in the area. Queues missing shade; 409 if nothing is ready yet, 422 if there's no data."""
     shade = await ensure_shade(bbox_polygon(box), 0, "PORTAL", None)
-    rows = await load_heat_pain(box, month, hours, limit)
+    rows = await load_heat_pain(box, month, hours, limit, await area_heat_weights(box))
     if rows:
         return rows, shade
     if shade.status == "PREPARING":

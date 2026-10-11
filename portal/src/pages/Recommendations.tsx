@@ -8,7 +8,7 @@ import { MONTHS, errorMessage, inr, shortInr, stretchName } from "../format";
 import { COST_SOURCES } from "../costs";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
-import MonthPicker, { HOTTEST_MONTH } from "../components/MonthPicker";
+import MonthPicker, { SUMMER_MONTH } from "../components/MonthPicker";
 import RecRow from "../components/RecRow";
 import SkeletonRows from "../components/SkeletonRows";
 import StateMessage from "../components/StateMessage";
@@ -51,7 +51,7 @@ export default function Recommendations() {
   const navigate = useNavigate();
   const [type, setType] = useState("TREE");
   const [budget, setBudget] = useState(0);
-  const [month, setMonth] = useState(HOTTEST_MONTH);
+  const [month, setMonth] = useState(SUMMER_MONTH);
   const [openIndex, setOpenIndex] = useState(0);
   const [recs, setRecs] = useState(null);
   const [stretches, setStretches] = useState({});
@@ -148,7 +148,7 @@ export default function Recommendations() {
     <aside className="flex min-h-0 flex-col border-l-2 border-ink bg-white">
       <PanelHead title="Trees + shelters">
         Where a row of trees or a shelter saves the most sun-minutes per rupee, 10 AM – 4 PM in {MONTHS[month - 1]}
-        {month === HOTTEST_MONTH ? ", the hottest month" : ""}.
+        {month === SUMMER_MONTH ? ", peak summer" : ""}.
       </PanelHead>
       <div className="flex border-b border-line">
         <Choice on={type === "TREE"} label="Plant" onClick={() => chooseType("TREE")}>

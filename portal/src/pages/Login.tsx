@@ -1,8 +1,9 @@
 import { useState } from "react";
 import { useLocation, useNavigate } from "react-router";
+import maplibregl from "maplibre-gl";
 import { Cube, Fire, SignIn, Tree } from "@phosphor-icons/react";
 import { DEMO, login } from "../auth";
-import { setSource, showLayers } from "../map";
+import { midpoint, setSource, showLayers } from "../map";
 import MapView from "../components/MapView";
 import DemoAccount from "../components/DemoAccount";
 import mujPain from "../api/fixtures/heat-pain.json";
@@ -17,9 +18,17 @@ const DOES = [
 ];
 
 // The still map behind sign-in is a real capture of the heat pain near MUJ (it can't call the API before sign-in)
+// The stretch the caption talks about is outlined in ink and tagged, so the caption points at one path
 function drawPain(map) {
-  showLayers(map, ["stretches"]);
+  showLayers(map, ["stretch-hi", "stretches"]);
   setSource(map, "stretches", mujPain.features.map((feature) => ({ type: "Feature", properties: { id: feature.properties.stretchId, pain: feature.properties.painScore }, geometry: feature.geometry })));
+  map.setFilter("stretch-hi", ["==", ["get", "id"], SHOWN]);
+  const shown = mujPain.features.find((feature) => feature.properties.stretchId === SHOWN);
+  if (!shown) return;
+  const tag = document.createElement("span");
+  tag.className = "bg-ink px-2 py-1 text-[13px] font-bold text-white";
+  tag.textContent = "This path";
+  new maplibregl.Marker({ element: tag, anchor: "left", offset: [14, 0] }).setLngLat(midpoint(shown.geometry)).addTo(map);
 }
 
 // Sign in (P1): the real heat-pain map on the left, what the portal does and the sign-in button on the right
