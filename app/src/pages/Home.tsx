@@ -52,7 +52,7 @@ export default function Home() {
   const [shadeAttempt, setShadeAttempt] = useState(0);
   const [askLive, setAskLive] = useState(false);
   // Streets still being prepared show up by themselves when their shade job is done
-  useShadeJob(streets?.shade, () => setShadeAttempt(shadeAttempt + 1));
+  const { gaveUp } = useShadeJob(streets?.shade, () => setShadeAttempt(shadeAttempt + 1));
   const { origin, destination } = search;
 
   function update(change) {
@@ -132,9 +132,11 @@ export default function Home() {
     : error
       ? "Can't load the shade map"
       : share === null
-        ? streets.shade.status === "PREPARING"
-          ? "Preparing shade data near you…"
-          : "No shade data near you yet"
+        ? streets.shade.status !== "PREPARING"
+          ? "No shade data near you yet"
+          : gaveUp
+            ? "Shade data near you is delayed"
+            : "Preparing shade data near you…"
         : `${share}% of streets near you in sun`;
   const whenOptions = [
     { value: "now", label: "Leave now" },
