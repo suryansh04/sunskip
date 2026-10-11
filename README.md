@@ -45,6 +45,20 @@ At 1 PM the entire walk is in the sun. Leaving at 5 PM cuts this to 7.6 minutes,
 
 ## Project images
 
+### Student app
+
+<table>
+  <tr>
+    <td align="center" valign="top" width="20%"><img src="project-images/app-home.jpg" width="170" alt="Student app home screen: a map of campus streets coloured by sun and shade, a red heat alert chip and the Where to? search sheet"><br><em>Home: shade around you and a heat alert</em></td>
+    <td align="center" valign="top" width="20%"><img src="project-images/app-routes.jpg" width="170" alt="Route options screen: a list of routes, each with its minutes walking in sun, total time, fare and the bus, metro and e-rickshaw steps"><br><em>Routes ranked by minutes in sun</em></td>
+    <td align="center" valign="top" width="20%"><img src="project-images/app-walk.jpg" width="170" alt="Walk detail screen: 11.3 minutes in direct sun for the walk to the Bus 26 stop, a sun and shade strip, and bars showing fewer sun minutes at later hours"><br><em>Walk detail and best time to leave</em></td>
+    <td align="center" valign="top" width="20%"><img src="project-images/ar-phone.jpeg" width="170" alt="AR view on a phone: chevron arrows drawn on a campus road through the camera, with a label showing sun for the next 45 m"><br><em>AR view: arrows on the path, blue in shade, orange in sun</em></td>
+    <td align="center" valign="top" width="20%"><img src="project-images/app-ask-hindi.jpg" width="170" alt="Ask SunSkip chat: a question in Hindi about leaving at 6 PM, answered in Hindi with the English line below it"><br><em>Ask SunSkip in Hindi</em></td>
+  </tr>
+</table>
+
+### Officials portal
+
 <p align="center"><img src="project-images/portal-sign-in.jpg" width="100%" alt="Portal sign-in page with a map of the MUJ area and one footpath highlighted"><br><em>Sign-in page, highlighting one footpath in the pilot area.</em></p>
 
 <p align="center"><img src="project-images/portal-heat-pain.jpg" width="100%" alt="Heat pain screen with ranked footpath stretches on a map and in a list"><br><em>Heat pain: the worst stretches around MUJ for May, 10 AM to 4 PM.</em></p>
