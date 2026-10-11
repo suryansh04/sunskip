@@ -69,16 +69,15 @@ Every error looks like `{ "error": { "code", "message", "requestId" } }`.
 | 409     | `SHADE_PREPARING` | Portal needs shade that is still being prepared (body has `jobId`)                                                      | Poll the job, retry        |
 | 422     | `NO_ROUTE_FOUND`  | No route, or place not found                                                                                            | Suggest auto / pick on map |
 | 422     | `NO_SHADE_DATA`   | Portal needs shade; Google has none there                                                                               | Explain                    |
-| 429     | `RATE_LIMITED`    | Not used in v1 (reserved). Too many calls (`Retry-After` set)                                                           | Wait                       |
+| 429     | `RATE_LIMITED`    | The daily cap on agent questions or voice calls is used up (per device or in total)                                     | Wait until tomorrow        |
 | 502/504 | `UPSTREAM_ERROR`  | Google, Sarvam, Claude or Open-Meteo failed                                                                             | Use a fallback             |
 | 500/503 | `INTERNAL_ERROR`  | Our bug or DB down                                                                                                      | Retry once, then a banner  |
-| 501     | `NOT_IMPLEMENTED` | Agent and voice endpoints until P2's code is in                                                                         | Hide the feature (the app checks `/meta` `features`, so it never needs this) |
 
 **Student-app endpoints never fail because shade is missing.** They return results with a `shade` block and `null` sun fields instead.
 
 ### Limits, caching, speed
 
-- **Rate limits:** API Gateway's 50 requests/s throttle only. FastAPI has no per-client limiter in v1, so `429 RATE_LIMITED` is not used yet (P2 may add a simple limit on `/agent/chat` and `/voice/*` if Claude/Sarvam cost needs it).
+- **Rate limits:** API Gateway's 50 requests/s throttle, plus daily caps on the paid calls: agent questions (`AGENT_QUESTIONS_PER_DEVICE_PER_DAY` 30, `AGENT_QUESTIONS_PER_DAY` 1000) and voice calls (`VOICE_CALLS_PER_DEVICE_PER_DAY` 60, `VOICE_CALLS_PER_DAY` 3000). Audio already made doesn't count. The counts are kept in the api process (there is one), so a restart resets them. Over a cap: `429 RATE_LIMITED`.
 - **Caching:**
   - trips: 30 min in `trips`;
   - Google Routes responses: 24 h;
@@ -529,9 +528,9 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 **Steps**
 
-1. Sarvam translates the message to English. Keep the original text.
+1. Claude (`CLAUDE_MODEL`, `claude-sonnet-5-5`) reads the message as written: Hindi, Hinglish or English. It is saved as typed.
 2. Load the session's last 20 messages. Never split a tool call from its result.
-3. Call Claude (`CLAUDE_MODEL`) with these tools, up to 4 rounds:
+3. Call Claude with these tools, up to 4 rounds, within `AGENT_BUDGET_S` (20 s). If `tripId` is sent and the trip hasn't expired, its options are in the prompt, so questions about it need no tool. Tools answer in short text with times like "5 PM"; `plan_route` saves and logs the trip like any plan, and looks names up among the OSM places near the user first:
 
    | Tool              | Runs                                                    |
    | ----------------- | ------------------------------------------------------- |
@@ -545,13 +544,14 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
    - Use only numbers from tool results.
    - Never say "safe". No medical advice.
    - If shade is `PREPARING`, say so and give timing advice. If `UNAVAILABLE`, say there is no shade data here.
-5. **Number check:** every number in the reply must match a tool result within ±1. On a mismatch, retry up to 2 times; then send a template summary with `fallback: true`.
-6. Sarvam translates the reply back. If `speak` is true, Bulbul TTS → S3 → `audioUrl`.
+5. **Number check:** every number in the reply must match a number in the tool results, the trip or the question within ±1, and the reply must not say "safe". On a mismatch, retry up to 2 times; then send a template summary of what the tools found, with `fallback: true`.
+6. If `language` is `hi-IN`, Sarvam translates the English reply (digits kept as 0–9); if that fails the English is sent with `replyLanguage: "en-IN"`. If `speak` is true, Bulbul speaks the reply → S3 → `audioUrl`.
 7. Save both turns.
 
 - **Errors:**
   - `404` for an unknown session.
-  - `502` if Claude fails.
+  - `502` if Claude fails before any tool answered (after that, the template answer).
+  - `429` over the daily cap.
   - If TTS fails: `audioUrl: null`, and the app uses browser speech.
 
 ### 10. `POST /voice/instructions`
@@ -561,8 +561,8 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 - **Body:** `{ "tripId", "optionId", "language" }`.
 - **Returns:** `{ "steps": [ { "index": 0, "triggerAtMeters": 0, "text": "...", "audioUrl": "..." } ] }`.
 - **`triggerAtMeters`** uses the same scale as the waypoints' `distanceFromStartM` (endpoint 7): metres walked from the start of the first walk leg, across all walk legs. The app plays a step when the walker's nearest waypoint reaches it.
-- **How:** cues come from the waypoint cues plus shade notes ("next 100 m is shaded"). Max 30.
-- **Audio** is cached in S3 by sha256(text|language|voice). A failed step gets `audioUrl: null`.
+- **How:** one step per straight run of the walk, said where it starts: "Head south along GHS footpath for 50 m. This part is in sun. Then turn right.", with "Then you reach your stop." before a ride and a last "You have reached your destination.". Max 30 (`VOICE_MAX_STEPS`). Each is translated (`mayura:v1`) and spoken (`bulbul:v3`, voice `priya`, MP3), 10 at a time; a step not ready within `VOICE_BUDGET_S` (20 s) is sent in English with `audioUrl: null`.
+- **Audio** is cached in S3 as `audio/{sha256(text|language|voice|source)}.mp3` with the spoken words in a `.txt` beside it, so a step is made once ever; links are presigned for `AUDIO_URL_TTL_S`. A step whose translation or voice fails keeps its text (English if the translation failed) with `audioUrl: null`. Without S3 (local runs) `audioUrl` is always null.
 
 ### 11. `POST /voice/tts`
 
@@ -577,7 +577,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 - **Request:** multipart field `audio` (max 30 s; webm from Chrome/Android, mp4 from iPhone Safari, or wav), optional `language`.
 - **Returns:** `{ "transcript": "...", "language": "hi-IN", "english": "If I go at 5, will there be less sun?" }`.
-- **How:** 2 Sarvam calls. STT (`mode: transcribe`) gives `transcript` + `language`; Sarvam translate then gives `english` (skipped when the language is already English). One STT call returns only one output.
+- **How:** 2 Sarvam calls. STT (`saaras:v3`, `mode: transcribe`, language detected) gives `transcript` + `language`; Sarvam translate then gives `english` (skipped when the language is already English). Clips over `STT_MAX_BYTES` (5 MB) are `400`.
 - **Note:** Sarvam's REST STT is meant for clips under 30 s; longer audio needs their batch API. It accepts WebM, MP4/M4A and WAV.
 
 ---
@@ -833,10 +833,13 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 
 | Name                                                                                                 | Default                                   |
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
-| `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | set at deploy (P2 adds them to `config.py` with the agent and voice code) |
+| `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | claude-sonnet-5-5, saaras:v3, mayura:v1, bulbul:v3, priya |
+| `AGENT_MAX_TOOL_ROUNDS`, `AGENT_MAX_RETRIES`, `AGENT_HISTORY_MESSAGES`, `AGENT_BUDGET_S`, `AGENT_NUMBER_TOLERANCE` | 4, 2, 20, 20, 1 |
+| `AGENT_QUESTIONS_PER_DEVICE_PER_DAY`, `AGENT_QUESTIONS_PER_DAY`, `VOICE_CALLS_PER_DEVICE_PER_DAY`, `VOICE_CALLS_PER_DAY` | 30, 1000, 60, 3000 |
+| `TTS_MAX_CHARS`, `STT_MAX_BYTES`, `VOICE_MAX_STEPS`, `VOICE_PARALLEL_CALLS`, `VOICE_BUDGET_S` | 500, 5000000, 30, 10, 20 |
 | `USE_FAKES`                                                                                          | false (true returns the pilot numbers)    |
 | `OUTSIDE_CALL_TIMEOUT_S`                                                                             | 10                                        |
-| `AGENT_LIVE`, `VOICE_LIVE` (shown in `/meta` `features`; P2 turns them on)                           | false, false                              |
+| `AGENT_LIVE`, `VOICE_LIVE` (shown in `/meta` `features`; on in production once the keys are in)      | false, false                              |
 | `WALK_SPEED_MPS`                                                                                     | 1.2                                       |
 | `HEAT_ALERT_FEELS_LIKE_C`                                                                            | 40                                        |
 | `SHADE_ALPHA`, `MAX_DETOUR_RATIO`                                                                    | 3.0, 1.3                                  |
@@ -852,7 +855,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `OVERPASS_URLS` (tried in order; the main server is often busy)                                      | overpass-api.de, then maps.mail.ru        |
 | `COOLER_PATH_MIN_SAVING_MIN`, `SOLAR_GEOTIFFS_PER_MINUTE`                                            | 1.0, 150                                  |
 | `SHORTER_PATH_MIN_SAVING_M`                                                                          | 100                                       |
-| `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600 (P2)                  |
+| `S3_BUCKET`, `AUDIO_URL_TTL_S`                                                                       | (bucket name), 3600                       |
 | `MAX_SHADE_MAP_KM2`, `POLL_AFTER_SECONDS`                                                            | 1, 3                                      |
 | `ORIGIN_SECRET_CHECK`                                                                                | true (false only locally)                 |
 | `MAX_PORTAL_BBOX_KM2`, `SIMULATION_REACH_M`                                                          | 25, 60                                    |

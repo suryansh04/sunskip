@@ -11,5 +11,5 @@ shapely
 pyproj
 pvlib==0.16.1
 anthropic==1.12.1
-sarvamai==0.1.36
+python-multipart==0.0.32
 ruff

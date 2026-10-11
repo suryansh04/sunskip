@@ -94,6 +94,30 @@ class Settings(BaseSettings):
     demand_decay_m: float = 150
     poll_after_seconds: int = 3
 
+    # Voice (Sarvam) and the agent (Claude), api.md §7
+    sarvam_url: str = "https://api.sarvam.ai"
+    sarvam_stt_model: str = "saaras:v3"
+    sarvam_translate_model: str = "mayura:v1"
+    sarvam_tts_model: str = "bulbul:v3"
+    sarvam_tts_voice: str = "priya"
+    audio_url_ttl_s: int = 3600
+    tts_max_chars: int = 500
+    stt_max_bytes: int = 5_000_000  # a 30 s clip is well under this
+    voice_max_steps: int = 30
+    voice_parallel_calls: int = 10
+    voice_budget_s: float = 20  # steps not spoken by then are read by the app
+    voice_calls_per_device_per_day: int = 60
+    voice_calls_per_day: int = 3000
+    claude_model: str = "claude-sonnet-5-5"
+    agent_max_tool_rounds: int = 4
+    agent_max_retries: int = 2
+    agent_history_messages: int = 20
+    agent_budget_s: float = 16  # stop asking Claude after this and answer from the numbers
+    agent_max_tokens: int = 400
+    agent_number_tolerance: float = 1
+    agent_questions_per_device_per_day: int = 30
+    agent_questions_per_day: int = 1000
+
     # Worker and api background loops
     heartbeat_interval_s: float = 30
     worker_idle_sleep_s: float = 2
