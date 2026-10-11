@@ -46,7 +46,7 @@ At 1 PM the whole walk is in the sun. Leaving at 5 PM cuts that to 7.6 minutes, 
 | Officials portal (open on a laptop; the sign-in page has a demo user button) | https://main.d2amqkpwwnkri3.amplifyapp.com |
 | API health check | https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1/health |
 
-**Team:** P1, Suryansh: the API and the officials portal. P2: the agent (Ask SunSkip) and voice. P3, Dhruv: the student app and the AR walk view.
+**Team:** P1, Suryansh: the API and the officials portal. P2, Tejas Mehra: the agent (Ask SunSkip) and voice. P3, Dhruv: the student app and the AR walk view.
 
 ## Project images
 
