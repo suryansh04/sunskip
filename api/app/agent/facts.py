@@ -5,19 +5,20 @@ from datetime import datetime
 
 from app.config import IST, settings
 from app.contracts.models import BestTimeResponse, Conditions, Leg, PlanResponse, RouteOption
+from app.core.formulas import NOON, hour_label
 from app.core.sun import sun_elevations
 
 MODE_WORDS = {"WALK": "walk", "BUS": "bus", "METRO": "metro", "RAIL": "train", "ERICKSHAW": "e-rickshaw"}
-NOON = 12
 OPTIONS_SHOWN = 3
 SECONDS_PER_MINUTE = 60
 
 
 def clock(moment: datetime) -> str:
     local = moment.astimezone(IST)
-    hour = local.hour % NOON or NOON
+    if local.minute == 0:
+        return hour_label(local.hour)
     half = "AM" if local.hour < NOON else "PM"
-    return f"{hour} {half}" if local.minute == 0 else f"{hour}:{local.minute:02d} {half}"
+    return f"{local.hour % NOON or NOON}:{local.minute:02d} {half}"
 
 
 def whole_minutes(seconds: int) -> int:

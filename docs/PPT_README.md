@@ -604,7 +604,7 @@ Desktop-first (1280 px+). A black top bar with four sections (**Heat pain, Trees
 
 ### 11.3 Trees + shelters (`/recommendations`)
 - **Plant (trees)** or **Build (shelters)**.
-- For the **top 20 stretches**, the API places items (a **tree every 8 m** along the stretch, up to 50; or **one 3 × 6 m shelter** at the nearest stop within 30 m, else halfway), **runs the simulator** on each, and counts only the sun saved on that stretch.
+- For **20 candidate stretches** (the 10 most painful, plus the ones with the most people in sun per metre, so short busy paths compete), the API places items (a **tree every 8 m** along the stretch, up to 50; or **one 3 × 6 m shelter** at the nearest stop within 30 m, else halfway), **runs the simulator** on each, and counts only the sun saved on that stretch.
 - Ranked by **sun-minutes saved per day per rupee**.
 - Each recommendation shows: shade **before → after**, people a day, **sun-minutes saved per day**, **cost (estimate)**, and a plain-language reason ("430 m in 100% sun from 10:00 to 16:00 in May, used by about 1,200 people a day").
 - **Budget:** type an amount or tap a preset (₹50,000, ₹2 lakh, ₹10 lakh, ₹25 lakh); the plan takes recommendations in order, skipping what no longer fits.
@@ -623,7 +623,7 @@ A one-page report an official can attach to a proposal, **printable on A4**:
 ### 11.5 Simulator (`/simulate`)
 A **3D what-if** before spending money:
 - Opens with **recommendation #1's plan**, clearly labelled "**Proposed · recommendation 1 · 6 new trees · not what stands there today**"; proposed items are drawn lighter until someone changes them. **"Start empty"** clears the map; **"Reset"** brings back the recommended plan.
-- **Click the map** to add a tree or shelter (paths within 60 m of it get its shade); **drag** to move; select to edit; up to 50 items.
+- **Click the map** to add a tree or shelter (paths within 60 m of it get its shade); clicking an existing item selects it instead of stacking a new one; the next item added is the kind last chosen; **drag** to move; select to edit; up to 50 items.
 - **Trees by species:** Neem (15 m), Arjun (20 m), Siris (20 m), Peepal (25 m); **Young** (6 m tall, 3 m crown) or **Grown** (species height, 6 m crown).
 - **Shelters by type:** Basic, Concrete, Steel, Smart, with width, length, roof height and **rotation** sliders.
 - Trees and shelters are drawn in **3D on the map** (MapLibre fill-extrusion): a tree is a trunk and a crown of three stacked discs, a shelter is four posts and a flat roof. New items grow out of the ground; right-drag turns the view.
