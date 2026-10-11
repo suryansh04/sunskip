@@ -1,16 +1,19 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router";
-import { ArrowLeft, Bus, MagnifyingGlass, MapPin, TrainSimple, XCircle } from "@phosphor-icons/react";
+import { ArrowLeft, Bus, Crosshair, MagnifyingGlass, MapPin, TrainSimple, XCircle } from "@phosphor-icons/react";
 import places from "../api/fixtures/places.json";
 import { api } from "../api/client";
 import { fromLine } from "../format";
 import { MUJ_MAIN_GATE, NEW_SEARCH, recall, remember } from "../session";
+import { locate, ROUGH_M } from "../locate";
 import MapView from "../components/MapView";
 import TopBar from "../components/TopBar";
 import RoundButton from "../components/RoundButton";
 import Button from "../components/Button";
 
+const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
 const PICK_ZOOM = 16;
+const FOUND_ZOOM = 18; // close enough to check the pin is on the right side of the road
 const MIN_QUERY_LETTERS = 2; // the API looks up names of 2 letters or more
 const KIND_ICON = { metro: TrainSimple, bus: Bus, place: MapPin, typed: MagnifyingGlass };
 const TYPE_PAUSE_MS = 250; // look names up once typing pauses
@@ -36,6 +39,10 @@ export default function Search() {
   const picking = params.get("pick");
   const start = search.origin || MUJ_MAIN_GATE;
   const [pin, setPin] = useState(start);
+  const [view, setView] = useState({ center: [start.lng, start.lat], zoom: PICK_ZOOM });
+  const [finding, setFinding] = useState(null); // { accuracyM } while the GPS settles
+  const [findNote, setFindNote] = useState("");
+  const stopFinding = useRef(null);
   const [nearby, setNearby] = useState([]);
   const [looking, setLooking] = useState(false);
   const [lookFailed, setLookFailed] = useState(false);
@@ -68,7 +75,55 @@ export default function Search() {
     remember("search", next);
   }
 
+  useEffect(() => () => stopFinding.current?.(), []);
+
+  function startHere(place) {
+    save({ origin: { lat: place.lat, lng: place.lng, name: null, mine: true, foundAt: Date.now() } });
+    setParams({}, { replace: true });
+  }
+
+  // "Use my current location": follow the GPS on the map while it settles, then start from it
+  function useMyLocation() {
+    if (USE_MOCKS) return startHere(MUJ_MAIN_GATE);
+    stopFinding.current?.();
+    setFindNote("");
+    setFinding({ accuracyM: null });
+    stopFinding.current = locate(
+      (fix) => {
+        setFinding({ accuracyM: fix.accuracyM });
+        setPin(fix);
+        setView({ center: [fix.lng, fix.lat], zoom: FOUND_ZOOM });
+      },
+      (best, failure) => {
+        setFinding(null);
+        if (!best) {
+          setFindNote(failure === "denied" ? "Location is blocked for this site. Allow it in the browser's site settings, or move the map to your start." : "Couldn't find your location. Move the map to your start instead.");
+          return;
+        }
+        if (best.accuracyM > ROUGH_M) {
+          setFindNote(`Your phone shared only a rough location (±${Math.round(best.accuracyM)} m). Turn on Precise location for this browser, or move the map to your start.`);
+          return;
+        }
+        startHere(best);
+      },
+    );
+  }
+
+  // Taking the pin, going back or moving the map by hand ends the GPS search, so a late fix can't override it
+  function stopLooking() {
+    stopFinding.current?.();
+    stopFinding.current = null;
+    setFinding(null);
+  }
+
+  function leavePicker() {
+    stopLooking();
+    setFindNote("");
+    setParams({}, { replace: true });
+  }
+
   function takePin() {
+    stopLooking();
     if (picking === "from") {
       save({ origin: { lat: pin.lat, lng: pin.lng, name: "the pinned start", mine: false, pinned: true } });
       return setParams({}, { replace: true });
@@ -81,19 +136,29 @@ export default function Search() {
     return (
       <main>
         <MapView
-          camera={{ center: [start.lng, start.lat], zoom: PICK_ZOOM }}
+          camera={view}
           padding={{ top: 0, bottom: 0, left: 0, right: 0 }}
           streets={null}
           lines={null}
           start={null}
           end={null}
           you={null}
-          creditBottom={96}
-          onMoved={setPin}
+          creditBottom={picking === "from" ? 162 : 96}
+          onMoved={(center) => {
+            stopLooking();
+            setPin(center);
+          }}
         />
-        <TopBar title={picking === "from" ? "Pick the start" : "Pick the destination"} subtitle="Move the map so the pin is on the place" onBack={() => setParams({}, { replace: true })} />
+        <TopBar title={picking === "from" ? "Pick the start" : "Pick the destination"} subtitle="Move the map so the pin is on the place" onBack={leavePicker} />
         <MapPin size={44} weight="fill" aria-hidden className="pointer-events-none absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-full text-ink" />
-        <div className="absolute inset-x-4 bottom-[calc(16px+env(safe-area-inset-bottom))]">
+        <div className="absolute inset-x-4 bottom-[calc(16px+env(safe-area-inset-bottom))] flex flex-col gap-2.5">
+          {findNote && <p className="rounded-[14px] bg-white px-4 py-3 text-[14px] text-alert shadow-[0_6px_20px_rgba(40,25,10,.15)]">{findNote}</p>}
+          {picking === "from" && (
+            <Button ghost disabled={finding !== null} onClick={useMyLocation} className="bg-white shadow-[0_6px_20px_rgba(40,25,10,.15)] disabled:opacity-100">
+              <Crosshair size={20} weight="bold" className={finding ? "animate-pulse" : ""} />
+              {!finding ? "Use my current location" : finding.accuracyM === null ? "Finding you…" : `Finding you… ±${Math.round(finding.accuracyM)} m`}
+            </Button>
+          )}
           <Button onClick={takePin}>Use this place</Button>
         </div>
       </main>

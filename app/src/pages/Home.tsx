@@ -15,12 +15,11 @@ import Segmented from "../components/Segmented";
 import HeatSheet from "../components/HeatSheet";
 import TimeSheet from "../components/TimeSheet";
 import ChatPanel from "../features/agent/ChatPanel";
-import { createFixSmoother, watchGps } from "../features/ar/gps";
+import { locate } from "../locate";
 
 const USE_MOCKS = import.meta.env.VITE_USE_MOCKS === "true";
-const LOCATE_GOOD_M = 15; // stop looking once the fix is this close
-const LOCATE_MAX_MS = 15000; // or after this long, keeping the best fix so far
 const LOCATE_MOVE_M = 25; // while looking, move the start only for a change this big (each move reloads the shade)
+const FRESH_MS = 60000; // a location found this recently (on the pick-the-start map) is used as it is
 const HOME_MAX_ZOOM = 15.6;
 const NEAR_YOU_M = 300; // how far around you the map shows at first
 const FIND_DOTS_MS = 400;
@@ -64,45 +63,33 @@ export default function Home() {
     });
   }
 
-  // The first fix is often a rough Wi-Fi or cell guess. Keep listening and move the start as the
-  // GPS settles, until it is close enough or time runs out.
-  function locate() {
+  // Move the start as the GPS settles (locate.ts), and say so when no location comes at all
+  function findMe() {
     stopLocating.current?.();
     if (USE_MOCKS || !navigator.geolocation) return update({ origin: { ...MUJ_MAIN_GATE, mine: USE_MOCKS, fallback: !USE_MOCKS } });
-    const smoother = createFixSmoother();
-    let best = null;
     let shown = null;
     const show = (fix) => {
       shown = fix;
-      update({ origin: { lat: fix.lat, lng: fix.lng, name: null, mine: true } });
+      update({ origin: { lat: fix.lat, lng: fix.lng, name: null, mine: true, foundAt: Date.now() } });
     };
-    const stop = watchGps(
-      (raw) => {
-        best = smoother.push(raw) || best;
-        if (!best) return;
-        if (best.accuracyM <= LOCATE_GOOD_M) return finish();
-        if (!shown || metersBetween(shown, best) > LOCATE_MOVE_M) show(best);
+    stopLocating.current = locate(
+      (fix) => {
+        if (!shown || metersBetween(shown, fix) > LOCATE_MOVE_M) show(fix);
       },
-      finish,
+      (best) => {
+        if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false, fallback: true } });
+        else if (best !== shown) show(best);
+      },
     );
-    const timer = setTimeout(finish, LOCATE_MAX_MS);
-    stopLocating.current = () => {
-      clearTimeout(timer);
-      stop();
-    };
-    function finish() {
-      stopLocating.current();
-      if (!best) update({ origin: { ...MUJ_MAIN_GATE, mine: false, fallback: true } });
-      else if (best !== shown) show(best);
-    }
   }
 
   useEffect(() => {
     isLive("agent").then(setAskLive);
-    // Only a start picked on the map is kept; anything else is looked up again, since the walker may have moved
-    if (origin?.pinned) return;
+    // Only a start picked on the map, or a location found a moment ago, is kept; anything else is
+    // looked up again, since the walker may have moved
+    if (origin?.pinned || (origin?.mine && Date.now() - origin.foundAt < FRESH_MS)) return;
     update({ origin: null });
-    locate();
+    findMe();
     return () => stopLocating.current?.();
   }, []);
 
@@ -189,7 +176,7 @@ export default function Home() {
           </span>
         )}
         <span className="flex-1" />
-        <RoundButton label="Show my location" onClick={locate}>
+        <RoundButton label="Show my location" onClick={findMe}>
           <Crosshair size={22} weight="bold" />
         </RoundButton>
       </div>
