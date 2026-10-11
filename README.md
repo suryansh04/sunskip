@@ -1,16 +1,18 @@
+<p align="center"><img src="project-images/logo.jpeg" width="160" alt="SunSkip logo"></p>
+
 # SunSkip
 
 **Skip the sun, not the trip.**
 
 ## Introduction
 
-SunSkip is a trip planner that ranks routes by the minutes you spend in direct sun. It covers walking, bus, metro and e-rickshaw trips, and suggests the best time to leave. A companion officials portal uses the same data to show city teams which footpaths leave the most people exposed, and where trees or shelters would help most. It was built during a hackathon in October 2026.
+SunSkip helps people in India reach their destination with less time in direct sun. It finds routes on foot, by bus, metro or e-rickshaw that minimise sun exposure, and suggests the best time to leave. Alongside it, an officials portal turns the same data into decisions, showing city teams which footpaths leave the most people exposed and where new trees or shelters would do the most good.
 
 **The problem**
 
-- In an Indian summer, the walk to and from the bus or metro is the part of a trip spent in full sun.
-- At midday in May the sun over Jaipur is nearly overhead (about 82°), so a 10 m building casts a shadow only about 1.4 m long. At that hour, only trees, shelters and timing make a difference.
-- Map apps optimise for the shortest walk and ignore sun and shade, and city officials have no data on where shade is missing.
+- For many commuters, the hottest part of the day is the walk to and from the bus or metro.
+- At midday in May the sun over Jaipur stands at about 82°, so a 10 m building casts a shadow only 1.4 m long. Buildings offer almost no relief; only trees, shelters and timing do.
+- Navigation apps optimise for distance and time, with no notion of sun or shade, and city planners have no data on where shade is missing or who it would help.
 
 **The pilot walk**
 
@@ -44,7 +46,6 @@ At 1 PM the entire walk is in the sun. Leaving at 5 PM cuts this to 7.6 minutes,
 | --- | --- |
 | Student app (mobile) | https://main.d2p3yf0fdqcxbz.amplifyapp.com |
 | Officials portal (desktop; demo user available on the sign-in page) | https://main.d2amqkpwwnkri3.amplifyapp.com |
-| API health check | https://7mhceh7sl0.execute-api.ap-southeast-2.amazonaws.com/v1/health |
 
 ## Project images
 
