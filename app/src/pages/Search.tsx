@@ -20,7 +20,8 @@ const TYPE_PAUSE_MS = 250; // look names up once typing pauses
 const KIND_WORD = { HOSTEL: "Hostel", ACADEMIC: "College or school", CAMPUS_GATE: "Campus gate", FOOD: "Food", SHOP: "Shop", OTHER: "Place", BUS: "Bus stop", METRO: "Metro station" };
 
 function distanceWord(meters) {
-  return meters < 1000 ? `${meters} m away` : `${(meters / 1000).toFixed(1)} km away`;
+  // Round in whole hundreds of metres first: toFixed alone turns 1150 m into "1.1 km" (1.15 is 1.1499… as a float)
+  return meters < 1000 ? `${meters} m away` : `${(Math.round(meters / 100) / 10).toFixed(1)} km away`;
 }
 
 // A place from GET /places as a row of the list
@@ -48,7 +49,7 @@ export default function Search() {
   const [lookFailed, setLookFailed] = useState(false);
   const typed = query.trim();
 
-  // Names of hostels, gates, stops and shops near the start, from OSM (GET /places)
+  // Names of hostels, gates, stops and shops near the start, from OSM (GET /places); looked up again if the start moves
   useEffect(() => {
     setNearby([]);
     setLookFailed(false);
@@ -67,7 +68,7 @@ export default function Search() {
       current = false;
       clearTimeout(timer);
     };
-  }, [typed]);
+  }, [typed, start.lat, start.lng]);
 
   function save(change) {
     const next = { ...search, ...change };
