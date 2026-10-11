@@ -77,7 +77,7 @@ Every error looks like `{ "error": { "code", "message", "requestId" } }`.
 
 ### Limits, caching, speed
 
-- **Rate limits:** API Gateway's 50 requests/s throttle, plus daily caps on the paid calls: agent questions (`AGENT_QUESTIONS_PER_DEVICE_PER_DAY` 30, `AGENT_QUESTIONS_PER_DAY` 1000) and voice calls (`VOICE_CALLS_PER_DEVICE_PER_DAY` 60, `VOICE_CALLS_PER_DAY` 3000). Audio already made doesn't count. The counts are kept in the api process (there is one), so a restart resets them. Over a cap: `429 RATE_LIMITED`.
+- **Rate limits:** API Gateway's 50 requests/s throttle, plus daily caps on the paid calls: agent questions (`AGENT_QUESTIONS_PER_DEVICE_PER_DAY` 10, `AGENT_QUESTIONS_PER_DAY` 100) and voice calls (`VOICE_CALLS_PER_DEVICE_PER_DAY` 20, `VOICE_CALLS_PER_DAY` 200). Audio already made doesn't count. The counts are kept in the api process (there is one), so a restart resets them. Over a cap: `429 RATE_LIMITED`.
 - **Caching:**
   - trips: 30 min in `trips`;
   - Google Routes responses: 24 h;
@@ -540,12 +540,14 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
    | `explain_segment` | sun minutes, shade and stop shade for one leg of a trip |
 
 4. **Prompt rules:**
-   - English, under 60 words.
+   - English, at most 3 short plain sentences (under 60 words), no markdown: it is translated and read aloud.
+   - Claude thinks only between tool calls (`thinking: between_tools`); thinking before the answer could use the whole token budget and leave no answer.
+   - When the sun is down at the user's location (or at a walk's start), the facts say so, so darkness is never called shade.
    - Use only numbers from tool results.
    - Never say "safe". No medical advice.
    - If shade is `PREPARING`, say so and give timing advice. If `UNAVAILABLE`, say there is no shade data here.
-5. **Number check:** every number in the reply must match a number in the tool results, the trip or the question within ±1, and the reply must not say "safe". On a mismatch, retry up to 2 times; then send a template summary of what the tools found, with `fallback: true`.
-6. If `language` is `hi-IN`, Sarvam translates the English reply (digits kept as 0–9); if that fails the English is sent with `replyLanguage: "en-IN"`. If `speak` is true, Bulbul speaks the reply → S3 → `audioUrl`.
+5. **Number check:** every number in the reply must match a number in the tool results, the trip or the question within ±1; the reply must not say "safe", must not be empty or cut off, and must be under `AGENT_MAX_WORDS` (75) with no markdown. On a mismatch, retry up to 2 times; then send a template summary of what the tools found, with `fallback: true`.
+6. If `language` is `hi-IN`, Sarvam translates the English reply (digits kept as 0–9); if that fails the English is sent with `replyLanguage: "en-IN"`. If `speak` is true and the answer is ready within `AGENT_SPEAK_BY_S` (22 s), Bulbul speaks the reply → S3 → `audioUrl`; later answers come without audio so the request stays under 29 s. The app asks for `speak` only for spoken questions; a typed answer's Play button calls endpoint 11 on tap.
 7. Save both turns.
 
 - **Errors:**
@@ -835,7 +837,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | ---------------------------------------------------------------------------------------------------- | ----------------------------------------- |
 | `CLAUDE_MODEL`, `SARVAM_STT_MODEL`, `SARVAM_TRANSLATE_MODEL`, `SARVAM_TTS_MODEL`, `SARVAM_TTS_VOICE` | claude-sonnet-5-5, saaras:v3, mayura:v1, bulbul:v3, priya |
 | `AGENT_MAX_TOOL_ROUNDS`, `AGENT_MAX_RETRIES`, `AGENT_HISTORY_MESSAGES`, `AGENT_BUDGET_S`, `AGENT_NUMBER_TOLERANCE` | 4, 2, 20, 20, 1 |
-| `AGENT_QUESTIONS_PER_DEVICE_PER_DAY`, `AGENT_QUESTIONS_PER_DAY`, `VOICE_CALLS_PER_DEVICE_PER_DAY`, `VOICE_CALLS_PER_DAY` | 30, 1000, 60, 3000 |
+| `AGENT_QUESTIONS_PER_DEVICE_PER_DAY`, `AGENT_QUESTIONS_PER_DAY`, `VOICE_CALLS_PER_DEVICE_PER_DAY`, `VOICE_CALLS_PER_DAY` | 10, 100, 20, 200 |
 | `TTS_MAX_CHARS`, `STT_MAX_BYTES`, `VOICE_MAX_STEPS`, `VOICE_PARALLEL_CALLS`, `VOICE_BUDGET_S` | 500, 5000000, 30, 10, 20 |
 | `USE_FAKES`                                                                                          | false (true returns the pilot numbers)    |
 | `OUTSIDE_CALL_TIMEOUT_S`                                                                             | 10                                        |

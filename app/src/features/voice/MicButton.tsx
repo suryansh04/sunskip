@@ -3,6 +3,7 @@ import { Microphone } from "@phosphor-icons/react";
 import { api } from "../../api/client";
 
 const MAX_CLIP_MS = 30000; // /voice/stt takes clips up to 30 s
+const LIMIT_REACHED = 429;
 
 // Tap to talk, tap again when done. Records a clip, sends it to POST /voice/stt and gives back
 // { transcript, language, english, seconds }. onListening tells the host when recording starts and stops,
@@ -48,8 +49,9 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
     form.append("audio", audio, audio.type === "audio/webm" ? "question.webm" : "question.mp4");
     api
       .post("/voice/stt", form)
-      .then((res) => onTranscript({ ...res.data, seconds }))
-      .catch(() => onError("SunSkip couldn't hear that. Try again, or type your question."))
+      // Silence (or noise) comes back as an empty transcript: there is no question to send
+      .then((res) => (res.data.transcript.trim() ? onTranscript({ ...res.data, seconds }) : onError("SunSkip didn't hear a question. Tap the mic and try again, or type it.")))
+      .catch((err) => onError(err.response?.status === LIMIT_REACHED ? "Voice questions are used up for today. Type your question instead." : "SunSkip couldn't hear that. Try again, or type your question."))
       .finally(() => {
         setListening(false);
         onListening(false);
