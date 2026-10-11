@@ -165,7 +165,7 @@ export default function Stretch() {
           <Kpi
             value={pain?.painScore ?? "–"}
             color={bandOf(pain?.painScore).text}
-            label={ranked ? `pain · rank ${rankIndex + 1} in ${area.name}` : `pain · not in the top ${RANKED.limit} in ${area.name}`}
+            label={ranked ? `pain, May 10 AM – 4 PM · rank ${rankIndex + 1} in ${area.name}` : `pain · not in the top ${RANKED.limit} in ${area.name}`}
           />
         </div>
 
@@ -193,8 +193,8 @@ export default function Stretch() {
         </div>
 
         <p className="mt-7.5 max-w-[80ch] border-t border-line pt-3 text-[12.5px] leading-relaxed text-muted">
-          Shade: Google Solar API data layers, sampled every 5 m along OpenStreetMap paths. People a day: SunSkip estimate from OpenStreetMap places and app trips. Sun position: pvlib, day 15 of each
-          month. Paths © OpenStreetMap contributors.
+          Shade: Google Solar API data layers, sampled every 5 m along OpenStreetMap paths. People a day: SunSkip estimate from OpenStreetMap places and app trips. Heat: typical feels-like for each month and hour, from last year's Open-Meteo weather. Sun
+          position: pvlib, day 15 of each month. Paths © OpenStreetMap contributors.
         </p>
       </div>
     </section>

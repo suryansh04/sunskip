@@ -6,6 +6,7 @@ WARM_RANGE_C = 10
 HOT_STEP_C = 5
 MIN_DOSE_WEIGHT = 0.1
 FLOAT_NOISE_PLACES = 9
+NOON = 12
 
 
 def round_half_up(value: float | None, places: int = 1) -> float | None:
@@ -28,6 +29,11 @@ def heat_weight(feels_like_c: float | None) -> float:
 
 def dose_weight(feels_like_c: float | None) -> float:
     return max(heat_weight(feels_like_c), MIN_DOSE_WEIGHT)
+
+
+def hour_label(hour: int) -> str:
+    """13 -> "1 PM", the way people say it."""
+    return f"{hour % NOON or NOON} {'AM' if hour < NOON else 'PM'}"
 
 
 def round_whole(value: float | None) -> int | None:

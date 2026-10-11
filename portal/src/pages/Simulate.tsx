@@ -23,6 +23,20 @@ const VIEW_ZOOM = 18.8;
 const GROW_MS = 520;
 const LAYERS = ["buildings3d", "stretches", "changed", "items", "ground"];
 // What-if simulator (P5): try trees and shelters in 3D and see the shade they would add
+const HIT_PX = 22; // a click this close to where an item stands picks it
+
+// The item under the mouse: its 3D shape, or the spot it stands on (in the tilted view a roof is drawn above its
+// footprint, so a click on the ground under it misses the shape)
+function itemAt(map, point, items) {
+  const hit = map.queryRenderedFeatures(point, { layers: ["items"] })[0];
+  if (hit) return hit.properties.index;
+  const near = items
+    .map((item, index) => ({ index, px: map.project([item.location.lng, item.location.lat]).dist(point) }))
+    .filter((item) => item.px <= HIT_PX)
+    .sort((a, b) => a.px - b.px)[0];
+  return near ? near.index : null;
+}
+
 export default function Simulate() {
   const { map, area } = useOutletContext<any>();
   const location = useLocation();
@@ -120,16 +134,17 @@ export default function Simulate() {
     );
   }, [map, result, paths, view]);
 
-  // Mouse: click a path to add the chosen item; with the move tool, press an item to select it and drag it
+  // Mouse: click a path to add the chosen item (clicking an item selects it instead of stacking a new one on it);
+  // with the move tool, press an item to select it and drag it
   useEffect(() => {
     if (!map) return;
     let dragging = null;
     const down = (event) => {
       if (live.current.tool !== "move") return;
-      const hit = map.queryRenderedFeatures(event.point, { layers: ["items"] })[0];
-      if (!hit) return setSel(null);
+      const index = itemAt(map, event.point, live.current.items);
+      if (index === null) return setSel(null);
       event.preventDefault();
-      dragging = hit.properties.index;
+      dragging = index;
       setSel(dragging);
       map.dragPan.disable();
     };
@@ -150,7 +165,10 @@ export default function Simulate() {
     };
     const click = (event) => {
       const { tool: chosen, items: all, treeKind: tree, shelterKind: shelter } = live.current;
-      if (chosen === "move" || all.length >= MAX_ITEMS) return;
+      if (chosen === "move") return;
+      const index = itemAt(map, event.point, all);
+      if (index !== null) return setSel(index);
+      if (all.length >= MAX_ITEMS) return;
       const at = { lat: event.lngLat.lat, lng: event.lngLat.lng };
       const item = newItem(chosen, chosen === "TREE" ? tree : shelter, at, Math.round((360 - map.getBearing()) % 180));
       setItems([...all, item]);
@@ -195,6 +213,8 @@ export default function Simulate() {
   }
 
   function edit(patch) {
+    // The next one added is the kind just chosen
+    if (patch.kind) (items[sel].type === "TREE" ? setTreeKind : setShelterKind)(patch.kind);
     setItems(items.map((item, i) => (i === sel ? { ...item, ...patch, proposed: false } : item)));
     setDirty(true);
   }
