@@ -95,23 +95,32 @@ export default function Home() {
   // On its own, so a search started by "Show my location" also stops when Home closes
   useEffect(() => () => stopLocating.current?.(), []);
 
+  // The start moves as the GPS settles: an answer for a spot it has moved on from is dropped
   useEffect(() => {
     if (!origin) return;
+    let current = true;
     api
       .get("/conditions", { params: { lat: origin.lat, lng: origin.lng, at: nowIso } })
-      .then((res) => setConditions(res.data))
-      .catch(() => setConditions(null));
+      .then((res) => current && setConditions(res.data))
+      .catch(() => current && setConditions(null));
+    return () => {
+      current = false;
+    };
   }, [origin?.lat, origin?.lng]);
 
   useEffect(() => {
     if (!origin) return;
+    let current = true;
     setLoading(true);
     setError("");
     api
       .get("/shade/segments", { params: { bbox: bboxAround(origin), month: Number(nowIso.slice(5, 7)), hour: hourOf(nowIso) } })
-      .then((res) => setStreets(res.data))
-      .catch((err) => setError(errorMessage(err)))
-      .finally(() => setLoading(false));
+      .then((res) => current && setStreets(res.data))
+      .catch((err) => current && setError(errorMessage(err)))
+      .finally(() => current && setLoading(false));
+    return () => {
+      current = false;
+    };
   }, [origin?.lat, origin?.lng, shadeAttempt]);
 
   function findRoutes(place) {
