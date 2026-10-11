@@ -78,7 +78,7 @@ Shade data is fetched the first time someone plans a trip through an area, then 
 4. **Preparing shade.** A request never waits for shade data. If cells along a walk are missing, the API answers at once with plain routes, `shade.status: "PREPARING"` and a job id. A background worker downloads the shade files and the footpaths, and scores every path piece for every month and daylight hour. The app polls the job every 3 seconds for up to 2 minutes, then sends the same request again and shows the routes ranked by sun.
 5. **No shade data.** Outside India, or where Google has none, routes still work, the best time is estimated from the sun's angle and the temperature, and sun minutes show as "unknown".
 6. **Cost guard.** Each cell is fetched once, ever. Solar calls are capped at 6,500 a month (Google's free tier in India is 7,000), with at most 120 cells per job and 60 new cells per device per day.
-7. **Portal.** A nightly job estimates walkers per path piece from nearby places and from the routes people chose in the app. The portal ranks stretches with that and tests trees and shelters with a shadow simulation.
+7. **Portal.** A nightly job estimates walkers per path piece with a small transport model (trips between mapped places, walked along the shortest paths) and from the routes people chose in the app. The portal ranks stretches with that and tests trees and shelters with a shadow simulation.
 
 The formulas are in [api.md §4](docs/api.md).
 

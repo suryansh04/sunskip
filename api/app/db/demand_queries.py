@@ -1,15 +1,43 @@
+import asyncpg
+
 from app.db.pool import get_pool
 
-# poi walkers = sum of weight x exp(-distance / decay) for places within the radius;
-# app trips = trips in the last 30 days that used the segment (chosen option, else the top one)
-DEMAND_SQL = """
-WITH poi AS (
-  SELECT s.id AS segment_id,
-         COALESCE(sum(p.weight * exp(-ST_Distance(s.geom::geography, p.geom::geography) / $1)), 0) AS walkers
+APP_TRIPS_DAYS = 30  # the column is app_trips_30d
+
+
+async def load_walk_graph() -> list[asyncpg.Record]:
+    return await get_pool().fetch("SELECT id, from_node, to_node, length_m FROM segments")
+
+
+# Each place and stop joins the network at the nearer end of its nearest path
+TRIP_PLACES_SQL = """
+WITH places AS (
+  SELECT kind, geom FROM pois
+  UNION ALL
+  SELECT kind, geom FROM stops
+)
+SELECT places.kind, near.node
+FROM places
+CROSS JOIN LATERAL (
+  SELECT CASE WHEN ST_Distance(ST_StartPoint(s.geom), places.geom) <= ST_Distance(ST_EndPoint(s.geom), places.geom)
+              THEN s.from_node ELSE s.to_node END AS node
   FROM segments s
-  LEFT JOIN pois p ON ST_DWithin(s.geom::geography, p.geom::geography, $2)
-  WHERE s.shade_ready
-  GROUP BY s.id
+  WHERE ST_DWithin(s.geom::geography, places.geom::geography, $1)
+  ORDER BY s.geom <-> places.geom
+  LIMIT 1
+) near
+"""
+
+
+async def load_trip_places(snap_m: float) -> list[asyncpg.Record]:
+    return await get_pool().fetch(TRIP_PLACES_SQL, snap_m)
+
+
+# Modelled walkers per segment come in as two arrays; app trips = trips in the last 30 days that used the segment
+# (the chosen option, else the top one), added on top as trips a day
+SAVE_DEMAND_SQL = """
+WITH modelled AS (
+  SELECT * FROM unnest($1::int[], $2::float8[]) AS m(segment_id, walkers)
 ), app AS (
   SELECT seg_id, count(*) AS trips
   FROM (SELECT unnest(COALESCE(c.segment_ids, r.top_segment_ids)) AS seg_id
@@ -18,17 +46,18 @@ WITH poi AS (
   GROUP BY seg_id
 )
 INSERT INTO demand_estimates (segment_id, poi_walkers_per_day, app_trips_30d, walkers_per_day, computed_at)
-SELECT poi.segment_id, poi.walkers, COALESCE(app.trips, 0), poi.walkers + COALESCE(app.trips, 0)::float8 / $3, now()
-FROM poi LEFT JOIN app ON app.seg_id = poi.segment_id
+SELECT m.segment_id, m.walkers, COALESCE(app.trips, 0), m.walkers + COALESCE(app.trips, 0)::float8 / $3, now()
+FROM modelled m LEFT JOIN app ON app.seg_id = m.segment_id
 ON CONFLICT (segment_id) DO UPDATE
 SET poi_walkers_per_day = EXCLUDED.poi_walkers_per_day, app_trips_30d = EXCLUDED.app_trips_30d,
     walkers_per_day = EXCLUDED.walkers_per_day, computed_at = EXCLUDED.computed_at
 """
-APP_TRIPS_DAYS = 30  # the column is app_trips_30d
 
 
-async def update_demand(decay_m: float, radius_m: float) -> None:
-    await get_pool().execute(DEMAND_SQL, decay_m, radius_m, APP_TRIPS_DAYS)
+async def save_demand(walkers_by_segment: dict[int, float]) -> None:
+    segment_ids = list(walkers_by_segment)
+    walkers = [walkers_by_segment[segment_id] for segment_id in segment_ids]
+    await get_pool().execute(SAVE_DEMAND_SQL, segment_ids, walkers, APP_TRIPS_DAYS)
 
 
 async def count_demand_estimates() -> int:

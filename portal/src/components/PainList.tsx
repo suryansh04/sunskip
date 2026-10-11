@@ -51,7 +51,7 @@ export default function PainList({ rows, hover, onHover, onOpen }) {
       ))}
       <p className="px-6.5 pt-4 pb-6 text-[13px] leading-normal text-muted">
         <b className="text-ink">Pain</b> = people a day × length in direct sun × how hot those hours usually are (feels-like from last year's weather; under 30 °C counts as no heat). It is scaled so 100 is the
-        worst stretch in this area at its hottest hour of the year, so months and hours compare fairly. People a day are estimates from nearby colleges, stops and shops, plus SunSkip trips.
+        worst stretch in this area at its hottest hour of the year, so months and hours compare fairly. People a day are estimates from a model of walking trips between nearby colleges, hostels, stops and shops, plus SunSkip trips.
       </p>
     </div>
   );
