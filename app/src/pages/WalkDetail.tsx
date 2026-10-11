@@ -67,7 +67,10 @@ export default function WalkDetail() {
   // so tapping back and forth is instant. A trip is kept 30 min; after that (404) the walk is planned again.
   useEffect(() => {
     if (!planned?.option) return;
-    if (pointsByHour.current[hour]) return setPoints(pointsByHour.current[hour]);
+    if (pointsByHour.current[hour]) {
+      setLoading(false); // an hour still loading may have been left for this one
+      return setPoints(pointsByHour.current[hour]);
+    }
     let current = true;
     setLoading(true);
     walkPointsAt(planned, departAt)
