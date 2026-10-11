@@ -1,14 +1,32 @@
+import { useEffect, useState } from "react";
 import { Info } from "@phosphor-icons/react";
-import { hourLabel, inr } from "../format";
+import { hourLabel, inr, reducedMotion } from "../format";
 
 const BAR_TOP_PCT = 60; // the bars are drawn against 60% shade, so small gains still show
+const COUNT_MS = 700;
 
 function barHeight(shadePct) {
   return `${Math.min(100, Math.max(2, (shadePct / BAR_TOP_PCT) * 100))}%`;
 }
 
 // After Run: sun-minutes saved (counting up), shade before vs after each hour, and the approximation note
-export default function SimResult({ result, counted, grown }) {
+export default function SimResult({ result, grown }) {
+  const [counted, setCounted] = useState(0);
+  const target = result.sunMinutesSavedPerDay;
+
+  // The number counts up once the bars start to grow
+  useEffect(() => {
+    if (!grown || target === null || reducedMotion()) return setCounted(grown ? target || 0 : 0);
+    const started = performance.now();
+    let frame = 0;
+    const step = (now) => {
+      const t = Math.min(1, (now - started) / COUNT_MS);
+      setCounted(Math.round(target * (1 - Math.pow(1 - t, 3))));
+      if (t < 1) frame = requestAnimationFrame(step);
+    };
+    frame = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(frame);
+  }, [grown, target]);
   return (
     <div className="grid animate-enter gap-4 px-6.5 py-5">
       <div className="flex items-end gap-3.5">

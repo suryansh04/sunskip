@@ -4,15 +4,17 @@ import { ArrowsClockwise, CurrencyInr, HourglassMedium, Tree, Umbrella, WifiSlas
 import { api } from "../api/client";
 import useShadeJob from "../api/useShadeJob";
 import { PAIN_COLOR } from "../bands";
-import { errorMessage, inr, shortInr } from "../format";
+import { MONTHS, errorMessage, inr, shortInr } from "../format";
+import { COST_SOURCES } from "../costs";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
+import MonthPicker, { HOTTEST_MONTH } from "../components/MonthPicker";
 import RecRow from "../components/RecRow";
 import SkeletonRows from "../components/SkeletonRows";
 import StateMessage from "../components/StateMessage";
 
-const BUDGETS = [50000, 100000, 200000, 500000];
-const PAIN_QUERY = { month: 5, hours: "10-16", limit: 50 }; // the ranking the recommendations come from
+const BUDGETS = [50000, 200000, 1000000, 2500000]; // up to a few steel shelters (₹7.5 lakh each)
+const RANKED = { hours: "10-16", limit: 50 }; // the ranking the recommendations come from
 const OPEN_ZOOM = 17;
 const LAYERS = ["stretches", "stretch-hi", "pins"];
 const PIN_COLOR = { TREE: ["#3D6A2B", "#A9C79A"], SHELTER: ["#1E6FD9", "#A9C6F0"] }; // open, others
@@ -49,6 +51,7 @@ export default function Recommendations() {
   const navigate = useNavigate();
   const [type, setType] = useState("TREE");
   const [budget, setBudget] = useState(0);
+  const [month, setMonth] = useState(HOTTEST_MONTH);
   const [openIndex, setOpenIndex] = useState(0);
   const [recs, setRecs] = useState(null);
   const [stretches, setStretches] = useState({});
@@ -64,7 +67,7 @@ export default function Recommendations() {
     setLoading(true);
     setError("");
     setRecs(null);
-    Promise.all([api.get("/portal/recommendations", { params: { bbox: area.bbox, type } }), api.get("/portal/heat-pain", { params: { bbox: area.bbox, ...PAIN_QUERY } })])
+    Promise.all([api.get("/portal/recommendations", { params: { bbox: area.bbox, type, month, hours: RANKED.hours } }), api.get("/portal/heat-pain", { params: { bbox: area.bbox, month, ...RANKED } })])
       .then(([recRes, painRes]) => {
         if (!current) return;
         setRecs(recRes.data.recommendations);
@@ -80,7 +83,7 @@ export default function Recommendations() {
     return () => {
       current = false;
     };
-  }, [area.key, type, attempt]);
+  }, [area.key, type, month, attempt]);
 
   const plan = withinBudget(recs || [], budget);
   const open = plan[openIndex];
@@ -123,6 +126,11 @@ export default function Recommendations() {
     if (map) map.setFilter("stretch-hi", ["==", ["get", "id"], hover || ""]);
   }, [map, hover]);
 
+  function chooseMonth(next) {
+    setMonth(next);
+    setOpenIndex(0);
+  }
+
   function chooseType(next) {
     setType(next);
     setOpenIndex(0);
@@ -138,7 +146,10 @@ export default function Recommendations() {
 
   return (
     <aside className="flex min-h-0 flex-col border-l-2 border-ink bg-white">
-      <PanelHead title="Trees + shelters">Where a row of trees or a shelter saves the most sun-minutes per rupee. May, 10 AM – 4 PM.</PanelHead>
+      <PanelHead title="Trees + shelters">
+        Where a row of trees or a shelter saves the most sun-minutes per rupee, 10 AM – 4 PM in {MONTHS[month - 1]}
+        {month === HOTTEST_MONTH ? ", the hottest month" : ""}.
+      </PanelHead>
       <div className="flex border-b border-line">
         <Choice on={type === "TREE"} label="Plant" onClick={() => chooseType("TREE")}>
           <Tree size={16} weight="bold" />
@@ -148,7 +159,10 @@ export default function Recommendations() {
           <Umbrella size={16} weight="bold" />
           Shelters
         </Choice>
-        <label className="flex min-h-[62px] flex-[1.3] flex-col justify-center px-4 py-2.5 text-[12.5px] text-muted">
+        <MonthPicker month={month} onMonth={chooseMonth} className="flex-[1.2]" />
+      </div>
+      <div className="flex border-b border-line">
+        <label className="flex min-h-[62px] flex-[1.4] border-r border-line flex-col justify-center px-4 py-2.5 text-[12.5px] text-muted">
           Budget
           <span className="flex items-center gap-1 text-[15px] font-bold text-ink">
             ₹
@@ -167,8 +181,6 @@ export default function Recommendations() {
             )}
           </span>
         </label>
-      </div>
-      <div className="flex border-b border-line">
         {BUDGETS.map((amount) => (
           <button
             key={amount}
@@ -234,6 +246,12 @@ export default function Recommendations() {
             onEvidence={() => navigate(`/stretch/${rec.stretchId}`, { state: { from: "recs" } })}
           />
         ))}
+        {plan.length > 0 && (
+          <p className="px-6.5 pt-3 pb-6 text-[11.5px] leading-normal text-muted">
+            Each tree is priced as a neem, the hardiest roadside tree for Jaipur: an 8–10 ft sapling planted with a guard and three years of care (₹2,000), each shelter as a powder-coated steel bus shelter (₹7.5 lakh).
+            The simulator compares species and shelter types. {COST_SOURCES}
+          </p>
+        )}
       </div>
 
       <div className="absolute top-5 left-5 z-[3] flex border-2 border-ink bg-white text-[12px] font-bold">

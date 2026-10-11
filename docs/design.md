@@ -340,6 +340,13 @@ Easing: `cubic-bezier(.2,.8,.2,1)` for everything that enters or moves.
 
 **Motion:** panel content fades up 10 px on each screen change; hovering a row highlights the stretch and opening a recommendation flies the map to it; entering the simulator tilts the camera into 3D; new trees and shelters grow out of the ground; after Run the paths turn from before to after colours while the hour bars grow and the big number counts up. All of it is off under `prefers-reduced-motion`.
 
+**Costs (estimates, shown with their sources in the portal):**
+
+- **Tree, planted and protected:** 8–10 ft sapling (nursery listings: neem ₹120, gulmohar ₹349, banyan ₹459; ₹350 where a species wasn't listed) + pit and planting ₹200 + three years of care ₹400 ([IISc ETR 90](https://wgbis.ces.iisc.ac.in/energy/water/paper/ETR90/sec7.html)) + tree guard ₹1,280 ([Bathinda MC revised rate](https://www.tribuneindia.com/news/archive/post-row-mcb-revises-rate-for-buying-tree-guards-448205)). Neem ₹2,000, others ₹2,230. Recommendations price every tree as a neem (`tree_cost_inr`).
+- **Species in the simulator:** neem 15 m (13–20 m), arjun 20 m, siris 20 m (20–25 m), peepal 25 m (up to ~30 m). Grown crown radius 6 m from the [IRC](https://law.resource.org/pub/in/bis/irc/irc.gov.in.sp.103.2014.pdf) 12 m spacing between shade trees; no source gives crown widths. Young trees are 6 m / 3 m crown, as the recommendations assume.
+- **Bus shelters:** basic ₹2.5 lakh (Hyderabad ₹1–2 lakh, Mysuru ₹2.5 lakh), concrete 150 sq ft ₹3.5 lakh (Chandigarh), powder-coated steel ₹7.5 lakh (Delhi ₹8 lakh, Indore ₹7–8 lakh, Coimbatore ₹6.5 lakh), smart ₹22 lakh (Delhi stainless ₹20 lakh, Mangaluru ₹22–25 lakh). Recommendations price shelters as steel (`shelter_cost_inr`).
+- **Months:** every screen has a month picker; May is the default because it is the hottest month, and the portal says so.
+
 **Words:** "people a day" (always marked estimate), "sun-minutes saved a day", "in sun", "Unnamed path" for OSM paths with no name, ₹ amounts with "est.", never "safe".
 
 ## 13. Assets and credits
