@@ -16,10 +16,6 @@ class ApiError(Exception):
         self.extra = extra or {}
 
 
-def not_implemented() -> ApiError:
-    return ApiError(501, "NOT_IMPLEMENTED", "This endpoint is not built yet")
-
-
 def error_response(request: Request, status: int, code: str, message: str, extra: dict | None = None) -> JSONResponse:
     request_id = getattr(request.state, "request_id", None)
     body = {"error": {"code": code, "message": message, "requestId": request_id, **(extra or {})}}
