@@ -1,6 +1,4 @@
-<p align="center"><img src="project-images/logo.jpeg" width="160" alt="SunSkip logo"></p>
-
-# SunSkip
+# <img src="project-images/logo.jpeg" height="44" alt="SunSkip">
 
 **Skip the sun, not the trip.**
 
