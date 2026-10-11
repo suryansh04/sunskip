@@ -549,27 +549,10 @@ LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = :month AND sh.
 WHERE s.shade_ready AND s.geom && ST_MakeEnvelope(:w, :s, :e, :n, 4326);
 ```
 
-**Pain score per stretch** (`/portal/heat-pain`; tested → `str_001`, pain 100):
-
-```sql
-WITH seg AS (
-  SELECT s.stretch_id, s.length_m, d.walkers_per_day, COALESCE(avg(sh.sun_fraction), 0) AS sun
-  FROM segments s
-  JOIN demand_estimates d ON d.segment_id = s.id
-  LEFT JOIN segment_shade sh ON sh.segment_id = s.id AND sh.month = :month AND sh.hour BETWEEN :h1 AND :h2
-  WHERE s.geom && ST_MakeEnvelope(:w, :s, :e, :n, 4326)
-  GROUP BY s.id, s.stretch_id, s.length_m, d.walkers_per_day
-), st AS (
-  SELECT stretch_id,
-         sum(walkers_per_day * length_m) / sum(length_m) AS walkers_per_day,
-         sum(sun * length_m) / sum(length_m)             AS sun_share,
-         sum(length_m)                                   AS length_m
-  FROM seg GROUP BY stretch_id
-)
-SELECT st.*, 100 * (walkers_per_day * sun_share * length_m)
-             / NULLIF(max(walkers_per_day * sun_share * length_m) OVER (), 0) AS pain_score
-FROM st ORDER BY pain_score DESC;
-```
+**Pain score per stretch** (`/portal/heat-pain`): `HEAT_PAIN_SQL` in `api/app/db/portal_queries.py`. Per stretch it sums
+`sun_fraction × length_m` for each month and hour, weights each hour by how hot it typically is (an array of 288
+heat weights passed in), averages the chosen hours, and divides by the area's worst stretch at its worst month and hour
+(api.md §8).
 
 **Is a stop shaded at this hour?**
 

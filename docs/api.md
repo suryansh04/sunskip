@@ -155,7 +155,11 @@ waitSunMinutes = 0                          if the stop is shaded
 
 heatDose      = Σ over each hour of (sun minutes + wait-in-sun minutes in that hour) × max(heatWeight, 0.1)
 
-painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in the result)
+painScore     = 100 × walkersPerDay × heatSunMetres ÷ (the area's worst stretch at its worst month and hour)
+                heatSunMetres = mean over the chosen hours of Σ segment length_m × sun_fraction × typicalHeatWeight
+                typicalHeatWeight[month, hour] = mean heatWeight(feels-like) over last year's days (Open-Meteo archive,
+                at the bbox centre; weather down → 1). Sun-down hours count as no sun. One fixed yardstick, so
+                6 PM or December score lower than May noon; when it's never hot (all 0) people × sun orders the list.
 ```
 
 - **Check (real):** 810 m in full sun at 1.2 m/s = 11.25 → **11.3 min**.
@@ -638,6 +642,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 ```
 
 - **Real:** the ~430 m GHS footpath stretch.
+- **`painScore`** uses the formula in §8: 100 is the area's worst stretch at its hottest hour of the year, so the same stretch scores lower at 6 PM or in December. `sunShare` is still plain sun (no heat).
 - **`walkersEstimated`** is true while app trips are less than half of the estimate.
 - **`label`** describes a stretch that has no `name` in OpenStreetMap, from the OSM places and roads around it, in this order: a named place within `LABEL_PLACE_M` ("Footpath by B2 block"), the named road it joins within `LABEL_JOIN_M` ("Lane off GHS Hostel Main Road"), a named road within `LABEL_ROAD_M`, a named place within `LABEL_AREA_M` ("… near …"). Footpaths try the place first, streets and lanes the road. Only the part of a name before its first comma is used. `null` when the stretch has a `name`, or nothing named is near. It is a description, not an official name.
 

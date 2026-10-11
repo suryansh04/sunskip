@@ -591,9 +591,10 @@ Desktop-first (1280 px+). A black top bar with four sections (**Heat pain, Trees
 - API Gateway checks the Cognito token on every `/portal/*` call; FastAPI never sees an unsigned portal request.
 
 ### 11.2 Heat pain (`/`)
-- Ranks **stretches by pain score**: how many people walk them, how much of the time they're in sun, and how long they are. The worst in the area is 100.
+- Ranks **stretches by pain score**: how many people walk them, how much of the path is in sun, and how hot those hours usually are (feels-like from last year's weather). 100 is the area's worst stretch at its hottest hour of the year, one fixed scale, so 6 PM or December score lower than May noon.
+- **Headline:** the 10 worst stretches, the busiest one's people a day (never a sum, which would count one person many times), and how many are 90%+ in sun. When it's never hot (December), it says there's no heat pain.
 - **Bands:** Severe 70+ (deep red), High 40–69, Moderate 20–39, Low, Unknown. Lines on the map are coloured and **thicker for worse pain**; the top 10 get **rank tags** on the map (overlapping tags are spread out).
-- **Month picker** on every screen (May by default, labelled "**the hottest month**").
+- **Month picker** on every screen (May by default, labelled "**peak summer**").
 - **Hours:** 10 AM – 4 PM, or **"By hour"** with a slider (7 AM – 6 PM).
 - **CSV export** of the list.
 - Hover the list or map to highlight; click to open the stretch evidence.
@@ -686,7 +687,9 @@ Walkers per day on a path piece (demand estimate, nightly)
     + app trips that used it in the last 30 days ÷ 30
 
 Pain score of a stretch
-    100 × walkers per day × sun share × length ÷ (highest value in the area)
+    100 × walkers per day × Σ (length × sun fraction × typical heat weight) over the chosen hours
+        ÷ (the area's worst stretch at its hottest month and hour)
+    typical heat weight = heatWeight(feels-like) averaged over last year's days for that month and hour
 
 Simulator shadow
     sun position from pvlib (day 15 of the month, each hour, sun ≥ 5° up)
