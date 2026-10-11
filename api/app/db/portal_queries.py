@@ -135,3 +135,37 @@ async def load_stops_near_stretches(stretch_ids: list[int], max_m: float) -> lis
         stretch_ids,
         max_m,
     )
+
+
+# For each stretch with no OSM name: its main kind of way, and the nearest named places and roads
+# at the label distances. The && box (metres / 90,000 is a little over that many degrees in India) lets the GiST
+# index pick the few candidates; ST_DWithin on geography then checks the real distance in metres.
+STRETCH_LABEL_SQL = """
+WITH unnamed AS (SELECT id, geom FROM stretches WHERE id = ANY($1::int[]) AND name IS NULL),
+main_way AS (
+  SELECT DISTINCT ON (s.stretch_id) s.stretch_id, s.highway
+  FROM segments s JOIN unnamed u ON u.id = s.stretch_id
+  GROUP BY s.stretch_id, s.highway
+  ORDER BY s.stretch_id, sum(s.length_m) DESC
+)
+SELECT u.id, w.highway,
+  (SELECT p.name FROM pois p WHERE p.name IS NOT NULL AND p.geom && ST_Expand(u.geom, $2 / 90000.0)
+     AND ST_DWithin(p.geom::geography, u.geom::geography, $2)
+   ORDER BY p.geom <-> u.geom LIMIT 1) AS by_place,
+  (SELECT s.name FROM segments s WHERE s.name IS NOT NULL AND s.stretch_id IS DISTINCT FROM u.id
+     AND s.geom && ST_Expand(u.geom, $3 / 90000.0) AND ST_DWithin(s.geom::geography, u.geom::geography, $3)
+   ORDER BY s.geom <-> u.geom LIMIT 1) AS off_road,
+  (SELECT s.name FROM segments s WHERE s.name IS NOT NULL AND s.stretch_id IS DISTINCT FROM u.id
+     AND s.geom && ST_Expand(u.geom, $4 / 90000.0) AND ST_DWithin(s.geom::geography, u.geom::geography, $4)
+   ORDER BY s.geom <-> u.geom LIMIT 1) AS near_road,
+  (SELECT p.name FROM pois p WHERE p.name IS NOT NULL AND p.geom && ST_Expand(u.geom, $5 / 90000.0)
+     AND ST_DWithin(p.geom::geography, u.geom::geography, $5)
+   ORDER BY p.geom <-> u.geom LIMIT 1) AS near_place
+FROM unnamed u JOIN main_way w ON w.stretch_id = u.id
+"""
+
+
+async def load_stretch_label_parts(
+    stretch_ids: list[int], place_m: float, join_m: float, road_m: float, area_m: float
+) -> list[asyncpg.Record]:
+    return await get_pool().fetch(STRETCH_LABEL_SQL, stretch_ids, place_m, join_m, road_m, area_m)

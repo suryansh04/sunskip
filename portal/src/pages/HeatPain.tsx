@@ -42,9 +42,9 @@ function painQuery(area, month, byHour, hour) {
 }
 
 function downloadCsv(rows, fileName) {
-  const header = ["rank", "stretchId", "name", "lengthM", "sunShare", "walkersPerDay", "walkersEstimated", "painScore"];
+  const header = ["rank", "stretchId", "name", "label", "lengthM", "sunShare", "walkersPerDay", "walkersEstimated", "painScore"];
   const quote = (value) => (/[",\n]/.test(String(value)) ? `"${String(value).replace(/"/g, '""')}"` : value);
-  const lines = rows.map((row) => [row.rank, row.stretchId, row.name || "", row.lengthM, row.sunShare ?? "", row.walkersPerDay ?? "", row.walkersEstimated, row.painScore ?? ""]);
+  const lines = rows.map((row) => [row.rank, row.stretchId, row.name || "", row.label || "", row.lengthM, row.sunShare ?? "", row.walkersPerDay ?? "", row.walkersEstimated, row.painScore ?? ""]);
   const link = document.createElement("a");
   link.href = URL.createObjectURL(new Blob([[header, ...lines].map((line) => line.map(quote).join(",")).join("\n")], { type: "text/csv" }));
   link.download = fileName;
