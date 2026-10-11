@@ -35,7 +35,7 @@ export default function ItemEditor({ item, onChange, onRemove }) {
   }
 
   return (
-    <div className="grid animate-enter gap-3 border-b border-line px-6.5 py-4">
+    <div className="relative z-10 grid animate-enter gap-3 border-b border-line bg-white px-6.5 py-4">
       <h4 className="cond flex items-center gap-2 text-[20px]">
         <Icon size={20} weight="bold" />
         <Dropdown
