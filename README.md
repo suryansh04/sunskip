@@ -27,7 +27,7 @@ At 1 PM the entire walk is in the sun. Leaving at 5 PM cuts this to 7.6 minutes,
 - Shows a shade map for any hour, with feels-like temperature, air quality and a heat alert at 40 °C.
 - Provides turn-by-turn navigation with rerouting, plus an AR view that draws arrows on the path through the camera: blue in shade, orange in sun.
 - Answers trip questions by text or voice in Hindi or English, and speaks walking directions in Hindi.
-- Installs to the home screen as a PWA. Unknown values are shown as "unknown", never as 0.
+- Installs to the home screen as a PWA.
 
 **Officials portal**
 
@@ -126,12 +126,12 @@ cp .env.example .env
 npm run dev          # http://localhost:5174
 ```
 
-Runs in mock mode by default; leave `VITE_COGNITO_CLIENT_ID` empty to skip sign-in. For the live API, set `VITE_USE_MOCKS=false` and the same `API_PROXY_TARGET`, and keep the Cognito values (a portal account is required).
+Runs in mock mode by default; set `VITE_COGNITO_CLIENT_ID=` (empty) in `.env` to skip sign-in. For the live API, set `VITE_USE_MOCKS=false` and the same `API_PROXY_TARGET`, and keep the Cognito values (a portal account is required).
 
 **Before pushing**, run these from the repository root (CI runs the same checks):
 
 ```bash
-cd api && ruff check . && ruff format --check .
-cd app && npm run build
-cd portal && npm run build
+(cd api && ruff check . && ruff format --check .)
+(cd app && npm run build)
+(cd portal && npm run build)
 ```
