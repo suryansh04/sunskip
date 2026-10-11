@@ -42,7 +42,7 @@ export default function ShadeMap() {
   const [attempt, setAttempt] = useState(0);
   const [sheetHeight, setSheetHeight] = useState(0);
   const walks = useRef({});
-  useShadeJob(streets?.shade, () => setAttempt(attempt + 1));
+  const { gaveUp } = useShadeJob(streets?.shade, () => setAttempt(attempt + 1));
 
   // /shade/segments again when the hour changes or the map stops moving (it takes at most 1 km²)
   useEffect(() => {
@@ -123,9 +123,11 @@ export default function ShadeMap() {
                 ? "of streets here in sun"
                 : loading
                   ? `Loading the shade for ${hourLabel(hour)}…`
-                  : preparing
-                    ? "Preparing shade data for this area. It shows here by itself."
-                    : "No shade data for the streets here. Move the map to another area."}
+                  : preparing && gaveUp
+                    ? "Shade data for this area is taking longer than usual. Move the map, or come back in a few minutes."
+                    : preparing
+                      ? "Preparing shade data for this area. It shows here by itself."
+                      : "No shade data for the streets here. Move the map to another area."}
           </span>
         </div>
         {error && (
