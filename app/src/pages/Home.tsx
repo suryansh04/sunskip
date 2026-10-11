@@ -90,8 +90,10 @@ export default function Home() {
     if (origin?.pinned || (origin?.mine && Date.now() - origin.foundAt < FRESH_MS)) return;
     update({ origin: null });
     findMe();
-    return () => stopLocating.current?.();
   }, []);
+
+  // On its own, so a search started by "Show my location" also stops when Home closes
+  useEffect(() => () => stopLocating.current?.(), []);
 
   useEffect(() => {
     if (!origin) return;
