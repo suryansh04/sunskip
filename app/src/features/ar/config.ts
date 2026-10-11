@@ -56,10 +56,22 @@ export const POSITION_JUMP_M = 20
 
 // --- Heading ------------------------------------------------------------------------------------
 
+/**
+ * The heading is where the camera looks. Only with the phone nearly flat (the camera looking this
+ * steeply up or down: 0.9 is 64 degrees, 0.98 is 79) does it blend over to where the top edge points.
+ */
+export const HEADING_FLAT_FROM = 0.9
+export const HEADING_FLAT_FULL = 0.98
+/** Time constant of the running average of the heading (averaged as a direction, so 359 and 1 give 0). */
+export const HEADING_SMOOTHING_S = 0.1
+/** The shown heading stays put until the average is this far from it, then follows until it is this close. */
+export const HEADING_DEADBAND_DEG = 2.5
+export const HEADING_SETTLE_DEG = 0.5
+/** The shown heading never turns faster than this, so a compass glitch can't swing the arrows. */
+export const HEADING_MAX_TURN_DEG_PER_S = 180
+
 /** The 2D compass arrow points at the route this far ahead of the walker. */
 export const COMPASS_LOOKAHEAD_M = 20
-/** Time constant of the low-pass on the heading that drives the 2D compass arrow. */
-export const HUD_HEADING_SMOOTHING_S = 0.25
 /** A route bend at least this sharp counts as a turn: HUD, vibration and the re-align prompt. */
 export const TURN_MIN_DEG = 45
 /** The re-align prompt goes away by itself this far past the turn. */

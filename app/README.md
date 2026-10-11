@@ -104,11 +104,16 @@ Everything that calls `/agent/*` and `/voice/*` is in `features/agent` and `feat
 ## AR (P3)
 
 `src/features/ar/` is a copy of `ar/src/features/ar/` (commit `e8ba770`). It keeps its own style (strict types,
-its own helpers, `useMemo` / `useEffectEvent`). It compiled here unchanged; two edits were made in the copy:
+its own helpers, `useMemo` / `useEffectEvent`). It compiled here unchanged; these edits were made in the copy:
 
 - `ARView.tsx`: new optional prop `onUseArrow(reason)`. With it the sheet shows "Use arrow" (`'chosen'`), and the
   walker is sent to the arrow screen by itself when the camera or a permission fails (`'unavailable'`).
 - `BottomSheet.tsx`: the `'use-arrow'` action for that link.
+- `heading.ts` (new) and `stage.ts`: the heading comes from all three orientation angles, so tilting the phone
+  doesn't change it, and it is steadied (average, deadband, turn-rate cap). The camera glides between GPS fixes.
+- `ARView.tsx`: the stage is built once per mount. A new `waypoints` array with the same points changes nothing,
+  and different points (a reroute, the next walk) are drawn in place, so the host needs no `key`.
+  The 3D arrows come back from the 2D arrow only after 2 s of good GPS.
 
 `pages/Navigate.tsx` loads it with `React.lazy`, so three.js and LocAR stay out of the main bundle.
 

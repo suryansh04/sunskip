@@ -12,8 +12,9 @@ import {
   VIDEO_HEIGHT,
   VIDEO_WIDTH,
 } from './config.ts'
-import { createLocalProjection, normalizeDeg } from './geo.ts'
+import { createLocalProjection, deltaDeg, normalizeDeg } from './geo.ts'
 import type { LatLng } from './geo.ts'
+import { createHeadingSmoother, headingOf } from './heading.ts'
 
 export type CameraFeedState = 'off' | 'starting' | 'running' | 'denied' | 'error'
 export type MotionState = 'off' | 'needs-tap' | 'starting' | 'running' | 'denied' | 'unsupported'
@@ -47,10 +48,11 @@ export interface ArStage {
   toWorld(point: LatLng): { x: number; z: number } | null
   /**
    * Heading the camera looks along, degrees clockwise from north, with the heading offset
-   * applied. When the phone is tilted nearly flat this is where its top edge points.
+   * applied. Steadied (see heading.ts), and the same whether the phone is upright or tilted;
+   * lying nearly flat it is where the top edge points.
    */
   getFacingDeg(): number
-  /** The same heading straight from the sensors, without the heading offset. */
+  /** The same steadied heading without the heading offset. */
   getCompassDeg(): number
   /**
    * Correct a compass that reads wrong: the true heading is taken to be the sensor heading plus
@@ -102,10 +104,8 @@ function coverVerticalFovDeg(
   return THREE.MathUtils.radToDeg(2 * Math.atan(visibleVideoH / 2 / focalPx))
 }
 
-/** Vertical component of the view direction beyond which the phone counts as lying flat. */
-const FLAT_TILT = 0.8
-
 const MAX_FRAME_S = 0.25
+const UP = new THREE.Vector3(0, 1, 0)
 
 let videoElementCount = 0
 
@@ -129,7 +129,13 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
 
   // --- Heading ------------------------------------------------------------------------------
   let headingOffsetDeg = 0
-  const facing = new THREE.Vector3()
+  const forward = new THREE.Vector3()
+  const top = new THREE.Vector3()
+  const turn = new THREE.Quaternion()
+  /** Where the motion sensors say the phone points. The camera is this with its heading steadied. */
+  const sensed = new THREE.Object3D()
+  const headingSmoother = createHeadingSmoother()
+  let steadyDeg: number | null = null
 
   /** Turn `world` by the heading offset, pivoting on the camera so nearby content stays put. */
   const applyHeadingOffset = () => {
@@ -141,16 +147,30 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
     world.position.set(x - (x * cos + z * sin), 0, z - (z * cos - x * sin))
   }
 
-  const compassDeg = () => {
-    camera.getWorldDirection(facing)
-    if (Math.abs(facing.y) > FLAT_TILT) {
-      // Looking almost straight down (or up): the view direction has no usable compass
-      // heading, but the phone's top edge does.
-      const lookingDown = facing.y < 0
-      facing.set(0, 1, 0).applyQuaternion(camera.quaternion)
-      if (!lookingDown) facing.negate()
-    }
-    return normalizeDeg(THREE.MathUtils.radToDeg(Math.atan2(facing.x, -facing.z)))
+  /** Heading of an orientation, from all three of its axes (world: +x east, -z north, +y up). */
+  const headingOfQuaternion = (quaternion: THREE.Quaternion) => {
+    forward.set(0, 0, -1).applyQuaternion(quaternion)
+    top.set(0, 1, 0).applyQuaternion(quaternion)
+    return headingOf(
+      { east: forward.x, north: -forward.z, up: forward.y },
+      { east: top.x, north: -top.z, up: top.y },
+    )
+  }
+
+  const compassDeg = () => steadyDeg ?? headingOfQuaternion(camera.quaternion)
+
+  /**
+   * Point the camera where the sensors say, but with the steadied heading: tilt and roll follow
+   * the phone at once, while compass wobble and glitches don't swing the arrows.
+   */
+  const steadyCamera = (dtSeconds: number) => {
+    // Nothing from the sensors yet: don't start the average from a made-up heading.
+    if (steadyDeg === null && sensed.quaternion.w === 1) return
+    const sensedDeg = headingOfQuaternion(sensed.quaternion)
+    steadyDeg = headingSmoother.update(sensedDeg, dtSeconds)
+    // Turning about the vertical by +a moves the heading by -a.
+    turn.setFromAxisAngle(UP, THREE.MathUtils.degToRad(deltaDeg(steadyDeg, sensedDeg)))
+    camera.quaternion.copy(sensed.quaternion).premultiply(turn)
   }
 
   // --- Position ------------------------------------------------------------------------------
@@ -284,7 +304,7 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
   } else {
     // enablePermissionDialog false: LocAR's own iOS dialog is never removed from <body>, so the
     // page shows its own button and calls requestMotionPermission() instead.
-    const orientation = new DeviceOrientationControls(camera, {
+    const orientation = new DeviceOrientationControls(sensed, {
       smoothingFactor: ORIENTATION_SMOOTHING_FACTOR,
       enablePermissionDialog: false,
     })
@@ -326,7 +346,10 @@ export function createArStage(container: HTMLElement, options: ArStageOptions = 
     const dtSeconds =
       lastFrameMs === null ? 0 : Math.min((timeMs - lastFrameMs) / 1000, MAX_FRAME_S)
     lastFrameMs = timeMs
-    controls?.update()
+    if (controls) {
+      controls.update()
+      steadyCamera(dtSeconds)
+    }
     glideCamera(dtSeconds)
     frameCallbacks.forEach((callback) => callback(dtSeconds))
     renderer.render(scene, camera)

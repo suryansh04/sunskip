@@ -14,7 +14,6 @@ import {
   GPS_GATE_EXIT_SECONDS,
   GPS_GATE_SECONDS,
   GPS_GOOD_ACCURACY_M,
-  HUD_HEADING_SMOOTHING_S,
   PIN_VISIBLE_WITHIN_M,
   POSITION_GLIDE_S,
   POSITION_JUMP_M,
@@ -31,7 +30,7 @@ import {
 } from './config.ts'
 import { createConveyor } from './conveyor.ts'
 import type { PathPoint } from './conveyor.ts'
-import { bearingDeg, deltaDeg, destinationPoint, distanceM, normalizeDeg } from './geo.ts'
+import { bearingDeg, deltaDeg, destinationPoint, distanceM } from './geo.ts'
 import type { LatLng } from './geo.ts'
 import { createFixSmoother, watchGps } from './gps.ts'
 import InstructionCard from './InstructionCard.tsx'
@@ -528,7 +527,6 @@ export default function ARView({
     document.addEventListener('visibilitychange', onVisibilityChange)
     if (document.hidden) onVisibilityChange()
 
-    let hudHeadingDeg: number | null = null
     let shownCard: CardInfo | null = null
     let elapsed = 0
     let frames = 0
@@ -556,18 +554,10 @@ export default function ARView({
         setGate(false)
       }
 
-      // Low-passed heading for the 2D arrow, which would otherwise shiver with the compass.
+      // The stage's heading is already steadied, so the 2D arrow and the 3D arrows turn together.
       const facingDeg = stage.getFacingDeg()
-      hudHeadingDeg =
-        hudHeadingDeg === null
-          ? facingDeg
-          : normalizeDeg(
-              hudHeadingDeg +
-                deltaDeg(hudHeadingDeg, facingDeg) *
-                  (1 - Math.exp(-dtSeconds / HUD_HEADING_SMOOTHING_S)),
-            )
       if (gatedNow && compassArrowRef.current) {
-        const turnDeg = deltaDeg(hudHeadingDeg, guideBearingDeg)
+        const turnDeg = deltaDeg(facingDeg, guideBearingDeg)
         compassArrowRef.current.style.transform = `rotate(${turnDeg.toFixed(1)}deg)`
       }
 
