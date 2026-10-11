@@ -1,59 +1,26 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useOutletContext } from "react-router";
-import { ArrowCounterClockwise, ArrowsClockwise, Compass, Cursor, HandPointing, HourglassMedium, Play, Tree, Umbrella, WarningCircle } from "@phosphor-icons/react";
+import { ArrowCounterClockwise, ArrowsClockwise, HourglassMedium, Play, WarningCircle } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import { PAIN_COLOR } from "../bands";
-import { errorMessage, inr, reducedMotion } from "../format";
+import { COST_SOURCES, DEFAULT_SHELTER, DEFAULT_TREE, itemCost } from "../costs";
+import { asRequest, boxAround, itemsFor, newItem } from "../simItems";
+import { MONTHS, errorMessage, inr, reducedMotion } from "../format";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import { footprint, itemBlocks } from "../shapes";
 import PanelHead from "../components/PanelHead";
 import ItemEditor from "../components/ItemEditor";
 import SimResult from "../components/SimResult";
+import SimOverlays from "../components/SimOverlays";
+import MonthPicker from "../components/MonthPicker";
 import StateMessage from "../components/StateMessage";
 
-// Sizes and costs of a new item, as in api/app/config.py (tree_*, shelter_*, *_cost_inr). Costs are estimates.
-const NEW_TREE = { heightM: 6, crownRadiusM: 3 };
-const NEW_SHELTER = { heightM: 3, widthM: 3, lengthM: 6 };
-const COST_INR = { TREE: 3000, SHELTER: 60000 };
 const MAX_ITEMS = 50;
-const RUN = { month: 5, hours: [10, 16] };
+const HOURS = [10, 16]; // the hours the ranking uses
 const VIEW = { pitch: 60, bearing: -28 };
 const VIEW_ZOOM = 18.8;
-const REACH_M = 60; // paths this close to an item can get its shadow
-const MAX_BOX_M = 950; // /shade/segments takes at most 1 km²
-const METERS_PER_DEG = 111320;
 const GROW_MS = 520;
-const COUNT_MS = 700;
 const LAYERS = ["buildings3d", "stretches", "changed", "items", "ground"];
-const TOOLS = [
-  { key: "move", label: "Select and move", icon: Cursor },
-  { key: "TREE", label: "Add a tree", icon: Tree },
-  { key: "SHELTER", label: "Add a shelter", icon: Umbrella },
-];
-
-function itemsFor(rec) {
-  const size = rec.type === "TREE" ? NEW_TREE : { ...NEW_SHELTER, bearingDeg: 0 };
-  return rec.positions.map((location) => ({ type: rec.type, location: { ...location }, ...size }));
-}
-
-// What POST /portal/simulate takes for one item
-function asRequest(item) {
-  if (item.type === "TREE") return { type: "TREE", location: item.location, heightM: item.heightM, crownRadiusM: item.crownRadiusM };
-  return { type: "SHELTER", location: item.location, heightM: item.heightM, widthM: item.widthM, lengthM: item.lengthM, bearingDeg: item.bearingDeg };
-}
-
-// The paths around the items, for drawing the ones whose shade changed
-function boxAround(items) {
-  const lngs = items.map((item) => item.location.lng);
-  const lats = items.map((item) => item.location.lat);
-  const midLng = (Math.min(...lngs) + Math.max(...lngs)) / 2;
-  const midLat = (Math.min(...lats) + Math.max(...lats)) / 2;
-  const kx = METERS_PER_DEG * Math.cos((midLat * Math.PI) / 180);
-  const halfX = Math.min(((Math.max(...lngs) - Math.min(...lngs)) * kx) / 2 + REACH_M, MAX_BOX_M / 2) / kx;
-  const halfY = Math.min(((Math.max(...lats) - Math.min(...lats)) * METERS_PER_DEG) / 2 + REACH_M, MAX_BOX_M / 2) / METERS_PER_DEG;
-  return [midLng - halfX, midLat - halfY, midLng + halfX, midLat + halfY].map((n) => n.toFixed(6)).join(",");
-}
-
 // What-if simulator (P5): try trees and shelters in 3D and see the shade they would add
 export default function Simulate() {
   const { map, area } = useOutletContext<any>();
@@ -65,17 +32,19 @@ export default function Simulate() {
   const [items, setItems] = useState([]);
   const [sel, setSel] = useState(null);
   const [tool, setTool] = useState("move");
+  const [treeKind, setTreeKind] = useState(DEFAULT_TREE);
+  const [shelterKind, setShelterKind] = useState(DEFAULT_SHELTER);
+  const [month, setMonth] = useState(5);
   const [status, setStatus] = useState("loading"); // loading, idle, running, done, error, preparing, noData
   const [errorText, setErrorText] = useState("");
   const [result, setResult] = useState(null);
   const [paths, setPaths] = useState({});
   const [view, setView] = useState("after");
   const [grown, setGrown] = useState(false);
-  const [counted, setCounted] = useState(0);
   const [dirty, setDirty] = useState(false);
   const [attempt, setAttempt] = useState(0);
-  const live = useRef({ items, tool, sel });
-  live.current = { items, tool, sel };
+  const live = useRef({ items, tool, sel, treeKind, shelterKind });
+  live.current = { items, tool, sel, treeKind, shelterKind };
   const growing = useRef(null); // { index, grow } while a new item rises
   const firstLoad = useRef(true);
 
@@ -177,10 +146,10 @@ export default function Simulate() {
       map.dragPan.enable();
     };
     const click = (event) => {
-      const { tool: chosen, items: all } = live.current;
+      const { tool: chosen, items: all, treeKind: tree, shelterKind: shelter } = live.current;
       if (chosen === "move" || all.length >= MAX_ITEMS) return;
       const at = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-      const item = chosen === "TREE" ? { type: "TREE", location: at, ...NEW_TREE } : { type: "SHELTER", location: at, ...NEW_SHELTER, bearingDeg: Math.round((360 - map.getBearing()) % 180) };
+      const item = newItem(chosen, chosen === "TREE" ? tree : shelter, at, Math.round((360 - map.getBearing()) % 180));
       setItems([...all, item]);
       setSel(all.length);
       setDirty(true);
@@ -213,16 +182,7 @@ export default function Simulate() {
     requestAnimationFrame(step);
   }
 
-  function countUp(target) {
-    if (target === null || reducedMotion()) return setCounted(target || 0);
-    const started = performance.now();
-    const step = (now) => {
-      const t = Math.min(1, (now - started) / COUNT_MS);
-      setCounted(Math.round(target * (1 - Math.pow(1 - t, 3))));
-      if (t < 1) requestAnimationFrame(step);
-    };
-    requestAnimationFrame(step);
-  }
+
 
   function resetView() {
     const line = stretchLine ? flatCoords(stretchLine) : [];
@@ -231,8 +191,13 @@ export default function Simulate() {
     else map.easeTo({ center: area.center, zoom: 17, ...VIEW, duration: reducedMotion() ? 0 : 1000 });
   }
 
-  function edit(field, value) {
-    setItems(items.map((item, i) => (i === sel ? { ...item, [field]: value } : item)));
+  function edit(patch) {
+    setItems(items.map((item, i) => (i === sel ? { ...item, ...patch } : item)));
+    setDirty(true);
+  }
+
+  function chooseMonth(next) {
+    setMonth(next);
     setDirty(true);
   }
 
@@ -255,7 +220,7 @@ export default function Simulate() {
     setGrown(false);
     setSel(null);
     const box = boxAround(items);
-    Promise.all([api.post("/portal/simulate", { ...RUN, items: items.map(asRequest) }), api.get("/shade/segments", { params: { bbox: box, month: RUN.month, hour: 13 } }).catch(() => null)])
+    Promise.all([api.post("/portal/simulate", { month, hours: HOURS, items: items.map(asRequest) }), api.get("/shade/segments", { params: { bbox: box, month, hour: 13 } }).catch(() => null)])
       .then(([sim, segments]) => {
         if (segments) setPaths(Object.fromEntries(segments.data.features.map((feature) => [feature.properties.id, feature.geometry])));
         setResult(sim.data);
@@ -267,7 +232,6 @@ export default function Simulate() {
           () => {
             setGrown(true);
             setView("after");
-            countUp(sim.data.sunMinutesSavedPerDay);
           },
           reducedMotion() ? 0 : 120,
         );
@@ -280,7 +244,7 @@ export default function Simulate() {
   }
 
   const count = (type) => items.filter((item) => item.type === type).length;
-  const cost = items.reduce((sum, item) => sum + COST_INR[item.type], 0);
+  const cost = items.reduce((sum, item) => sum + itemCost(item), 0);
   const selected = items[sel];
 
   return (
@@ -293,13 +257,13 @@ export default function Simulate() {
           ["Trees", count("TREE")],
           ["Shelters", count("SHELTER")],
           ["Cost (estimate)", `₹${inr(cost)}`],
-          ["Shade for", "May, 10 – 4"],
         ].map(([label, value]) => (
-          <div key={label} className="flex min-h-[62px] flex-1 flex-col justify-center border-r border-line px-4 py-2.5 text-[12.5px] text-muted last:border-r-0">
+          <div key={label} className="flex min-h-[62px] flex-1 flex-col justify-center border-r border-line px-4 py-2.5 text-[12.5px] text-muted">
             {label}
             <b className="text-[15px] text-ink">{value}</b>
           </div>
         ))}
+        <MonthPicker month={month} onMonth={chooseMonth} className="flex-[1.2]" />
       </div>
 
       <div className="min-h-0 flex-1 overflow-auto">
@@ -307,7 +271,7 @@ export default function Simulate() {
         {status === "loading" && <p className="px-6.5 py-5 text-muted">Loading the plan to start from…</p>}
         {status === "idle" && !selected && (
           <p className="px-6.5 pt-4 pb-6 text-[13px] leading-normal text-muted">
-            Click a tree or shelter on the map to resize it. Shade is worked out from the sun's position on 15 May, hour by hour from 10 AM to 4 PM.
+            Click a tree or shelter on the map to change its kind or size. Shade is worked out from the sun's position on 15 {MONTHS[month - 1]}, hour by hour from 10 AM to 4 PM.
           </p>
         )}
         {status === "running" && (
@@ -316,7 +280,7 @@ export default function Simulate() {
             Working out the shade hour by hour…
           </div>
         )}
-        {status === "done" && result && <SimResult result={result} counted={counted} grown={grown} />}
+        {status === "done" && result && <SimResult result={result} grown={grown} />}
         {status === "preparing" && (
           <StateMessage icon={<HourglassMedium size={40} weight="bold" />} title="Getting this area ready" text="Shade data around these items is being fetched. Run it again in a few minutes." />
         )}
@@ -331,6 +295,7 @@ export default function Simulate() {
             </button>
           </StateMessage>
         )}
+        {status !== "loading" && <p className="px-6.5 pt-2 pb-5 text-[11.5px] leading-normal text-muted">{COST_SOURCES}</p>}
       </div>
 
       <div className="flex border-t-2 border-ink">
@@ -349,38 +314,18 @@ export default function Simulate() {
         </button>
       </div>
 
-      {/* Map overlays: the panel has no position of its own, so these are placed in <main> over the map */}
-      <div role="toolbar" aria-label="Simulator tools" className="absolute top-5 left-5 z-[3] flex flex-col bg-ink">
-        {TOOLS.map(({ key, label, icon: Icon }) => (
-          <button
-            key={key}
-            type="button"
-            aria-label={label}
-            title={label}
-            aria-pressed={tool === key}
-            onClick={() => setTool(key)}
-            className={`grid size-[50px] place-items-center border-b border-barline ${tool === key ? "bg-white text-ink" : "text-bartext hover:text-white"}`}
-          >
-            <Icon size={23} weight="bold" />
-          </button>
-        ))}
-        <button type="button" aria-label="Reset the 3D view" title="Reset the 3D view" onClick={resetView} className="grid size-[50px] place-items-center text-bartext hover:text-white">
-          <Compass size={23} weight="bold" />
-        </button>
-      </div>
-      {status === "done" && (
-        <div className="absolute top-5 right-[580px] z-[3] flex border-2 border-ink bg-white">
-          {["before", "after"].map((which) => (
-            <button key={which} type="button" aria-pressed={view === which} onClick={() => setView(which)} className={`px-4 py-2 text-[14px] font-bold capitalize ${view === which ? "bg-ink text-white" : ""}`}>
-              {which}
-            </button>
-          ))}
-        </div>
-      )}
-      <div className="absolute bottom-6 left-[calc((100%-560px)/2)] z-[3] flex -translate-x-1/2 items-center gap-2 border-2 border-ink bg-white px-3.5 py-2 text-[13.5px] whitespace-nowrap">
-        <HandPointing size={18} weight="bold" />
-        {tool === "move" ? "Drag a tree or shelter to move it · right-drag to turn the view" : `Click a path to add a ${tool === "TREE" ? "tree" : "shelter"}`}
-      </div>
+      <SimOverlays
+        tool={tool}
+        onTool={setTool}
+        onResetView={resetView}
+        showView={status === "done"}
+        view={view}
+        onView={setView}
+        treeKind={treeKind}
+        onTreeKind={setTreeKind}
+        shelterKind={shelterKind}
+        onShelterKind={setShelterKind}
+      />
     </aside>
   );
 }
