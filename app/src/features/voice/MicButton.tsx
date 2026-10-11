@@ -12,12 +12,18 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
   const [listening, setListening] = useState(false);
   const recorder = useRef(null);
   const clipTimer = useRef(null);
+  const closed = useRef(false);
 
   useEffect(() => {
+    closed.current = false;
     if (autoStart) start();
     return () => {
+      // Closed mid-question: drop the clip instead of sending it (each one uses a daily voice call)
+      closed.current = true;
       clearTimeout(clipTimer.current);
-      recorder.current?.stream.getTracks().forEach((track) => track.stop());
+      if (!recorder.current) return;
+      recorder.current.onstop = null;
+      recorder.current.stream.getTracks().forEach((track) => track.stop());
     };
   }, []);
 
@@ -26,6 +32,8 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
+        // Allowed only after the chat was closed: let go of the mic straight away
+        if (closed.current) return stream.getTracks().forEach((track) => track.stop());
         // Chrome and Android record webm, iPhone Safari mp4; the API takes both
         const type = MediaRecorder.isTypeSupported("audio/webm") ? "audio/webm" : "audio/mp4";
         const clip = [];
@@ -54,8 +62,12 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
     form.append("audio", audio, audio.type === "audio/webm" ? "question.webm" : "question.mp4");
     api
       .post("/voice/stt", form)
-      // Silence (or noise) comes back as an empty transcript: there is no question to send
-      .then((res) => (res.data.transcript.trim() ? onTranscript({ ...res.data, seconds }) : onError("SunSkip didn't hear a question. Tap the mic and try again, or type it.")))
+      .then((res) => {
+        if (closed.current) return; // the chat was closed while the clip was being heard: ask nothing
+        // Silence (or noise) comes back as an empty transcript: there is no question to send
+        if (res.data.transcript.trim()) onTranscript({ ...res.data, seconds });
+        else onError("SunSkip didn't hear a question. Tap the mic and try again, or type it.");
+      })
       .catch((err) => onError(err.response?.status === LIMIT_REACHED ? "Voice questions are used up for today. Type your question instead." : "SunSkip couldn't hear that. Try again, or type your question."))
       .finally(() => {
         setListening(false);
