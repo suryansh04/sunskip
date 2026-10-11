@@ -11,10 +11,14 @@ const LIMIT_REACHED = 429;
 export default function MicButton({ onTranscript, onListening, onError, autoStart = false, className = "" }) {
   const [listening, setListening] = useState(false);
   const recorder = useRef(null);
+  const clipTimer = useRef(null);
 
   useEffect(() => {
     if (autoStart) start();
-    return () => recorder.current?.stream.getTracks().forEach((track) => track.stop());
+    return () => {
+      clearTimeout(clipTimer.current);
+      recorder.current?.stream.getTracks().forEach((track) => track.stop());
+    };
   }, []);
 
   function start() {
@@ -29,11 +33,12 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
         recorder.current = new MediaRecorder(stream, { mimeType: type });
         recorder.current.ondataavailable = (event) => clip.push(event.data);
         recorder.current.onstop = () => {
+          clearTimeout(clipTimer.current);
           stream.getTracks().forEach((track) => track.stop());
           send(new Blob(clip, { type }), Math.round((Date.now() - startedAt) / 1000));
         };
         recorder.current.start();
-        setTimeout(stop, MAX_CLIP_MS);
+        clipTimer.current = setTimeout(stop, MAX_CLIP_MS);
         setListening(true);
         onListening(true);
       })
