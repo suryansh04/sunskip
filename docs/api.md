@@ -670,7 +670,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
   - Trees: every 8 m along the stretch (6 m tall, 3 m crown). A stretch that would need more than 50 (the simulator's limit) gets 50, spaced evenly over its whole length. Shelter: one 3 × 6 m shelter at the nearest stop within 30 m, or else halfway along.
   - Simulate each (endpoint 16) and count only the sun saved on that stretch.
   - Pick the best by walkers × minutes saved ÷ cost.
-- Costs (₹3,000 per tree, ₹60,000 per shelter) are estimates. `reason` is a template, not an LLM.
+- Costs (₹2,000 per neem planted with a guard and three years of care, ₹7.5 lakh per powder-coated steel shelter) are estimates from Indian public figures; the sources are in design.md §12. `reason` is a template, not an LLM.
 
 ### 16. `POST /portal/simulate`
 
@@ -843,7 +843,7 @@ painScore     = 100 × walkersPerDay × sunShare × lengthM ÷ (highest value in
 | `SWAP_MIN_WALK_M`, `SWAP_MIN_HOT_SUN_MIN`                                                            | 500, 5                                    |
 | `ERICKSHAW_SPEED_MPS`, `ERICKSHAW_WAIT_SECONDS`                                                      | 4.2, 120                                  |
 | `WAYPOINT_SPACING_M`                                                                                 | 25                                        |
-| `TREE_SPACING_M`, `TREE_COST_INR`, `SHELTER_COST_INR`                                                | 8, 3000, 60000                            |
+| `TREE_SPACING_M`, `TREE_COST_INR`, `SHELTER_COST_INR`                                                | 8, 2000, 750000                           |
 | `CORRIDOR_BUFFER_M`, `MAX_CELLS_PER_JOB`, `MAX_NEW_CELLS_PER_CLIENT_PER_DAY`                         | 100, 120, 60                              |
 | `SOLAR_MONTHLY_CALL_BUDGET`, `WORKER_SOLAR_CONCURRENCY`                                              | 6500, 4                                   |
 | `OVERPASS_URLS` (tried in order; the main server is often busy)                                      | overpass-api.de, then maps.mail.ru        |

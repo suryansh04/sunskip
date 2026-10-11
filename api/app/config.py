@@ -53,8 +53,10 @@ class Settings(BaseSettings):
     # Portal (api.md §8, §11); costs are estimates
     max_portal_bbox_km2: float = 25
     tree_spacing_m: float = 8
-    tree_cost_inr: int = 3000
-    shelter_cost_inr: int = 60000
+    # Estimates from Indian public figures (sources in design.md §12): an 8-10 ft neem sapling ₹120, pit and planting
+    # ₹200, a municipal tree guard ₹1,280, three years of care ₹400; a powder-coated steel bus shelter ₹6.5-8 lakh
+    tree_cost_inr: int = 2000
+    shelter_cost_inr: int = 750000
     tree_height_m: float = 6
     tree_crown_radius_m: float = 3
     shelter_width_m: float = 3

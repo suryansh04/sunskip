@@ -8,6 +8,7 @@ import { BANDS, PAIN_COLOR } from "../bands";
 import { MONTHS, errorMessage, hourLabel, inr } from "../format";
 import { flyTo, midpoint, setSource, showLayers } from "../map";
 import PanelHead from "../components/PanelHead";
+import MonthPicker, { HOTTEST_MONTH } from "../components/MonthPicker";
 import PainList from "../components/PainList";
 import SkeletonRows from "../components/SkeletonRows";
 import StateMessage from "../components/StateMessage";
@@ -55,7 +56,7 @@ function downloadCsv(rows, fileName) {
 export default function HeatPain() {
   const { map, area } = useOutletContext<any>();
   const navigate = useNavigate();
-  const [month, setMonth] = useState(5);
+  const [month, setMonth] = useState(HOTTEST_MONTH);
   const [byHour, setByHour] = useState(false);
   const [hour, setHour] = useState(13);
   const [data, setData] = useState(null);
@@ -169,12 +170,12 @@ export default function HeatPain() {
 
   function chooseByHour(on) {
     setByHour(on);
-    if (on) setMonth(5); // the hour slider is for May, the month the ranking uses
+    if (on) setMonth(HOTTEST_MONTH); // the hour slider is for May, the month the ranking uses
   }
 
   const top = rows.slice(0, TAGGED);
   const placeName = area.place.split(",")[0];
-  const when = byHour ? `at ${hourLabel(hour)} in May` : `10 AM – 4 PM in ${MONTHS[month - 1]}`;
+  const when = byHour ? `at ${hourLabel(hour)} in May, the hottest month` : `10 AM – 4 PM in ${MONTHS[month - 1]}${month === HOTTEST_MONTH ? ", the hottest month" : ""}`;
   const busy = loading && !data;
   const cellsTotal = progress?.cellsTotal || data?.shade?.cellsTotal;
   const cellsDone = progress?.cellsDone ?? data?.shade?.cellsDone;
@@ -196,21 +197,7 @@ export default function HeatPain() {
       </PanelHead>
 
       <div className="flex border-b border-line">
-        <label className="flex min-h-[62px] flex-1 flex-col justify-center border-r border-line px-4 py-2.5 text-[12.5px] text-muted">
-          Month
-          <select
-            value={month}
-            disabled={byHour}
-            onChange={(event) => setMonth(Number(event.target.value))}
-            className="-ml-0.5 cursor-pointer bg-transparent text-[15px] font-bold text-ink disabled:cursor-default"
-          >
-            {MONTHS.map((name, i) => (
-              <option key={name} value={i + 1}>
-                {name}
-              </option>
-            ))}
-          </select>
-        </label>
+        <MonthPicker month={month} onMonth={setMonth} disabled={byHour} className="flex-1 border-r border-line" />
         <div className="flex min-h-[62px] flex-[1.4] flex-col justify-center border-r border-line px-4 py-2.5 text-[12.5px] text-muted">
           Hours
           <span className="mt-0.5 flex gap-1.5">
