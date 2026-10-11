@@ -84,10 +84,14 @@ export default function Results() {
   useEffect(() => {
     setPoints([]);
     if (!shown) return;
+    let current = true; // the points of an option no longer shown are dropped
     api
       .get(`/routes/${plan.tripId}/options/${shown.optionId}/waypoints`)
-      .then((res) => setPoints(res.data.waypoints))
-      .catch((err) => err.response?.status === 404 && planAgain());
+      .then((res) => current && setPoints(res.data.waypoints))
+      .catch((err) => current && err.response?.status === 404 && planAgain());
+    return () => {
+      current = false;
+    };
   }, [plan?.tripId, shown?.optionId]);
 
   useEffect(() => {
