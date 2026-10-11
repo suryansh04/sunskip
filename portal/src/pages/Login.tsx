@@ -10,7 +10,7 @@ import mujPain from "../api/fixtures/heat-pain.json";
 
 const MAP_CENTER = [75.5632, 26.8424];
 const MAP_ZOOM = 15.6;
-const SHOWN = "str_15221"; // GHs Footpath, the stretch the caption talks about
+const SHOWN = "str_14669"; // the worst stretch near MUJ, the one the caption talks about
 const DOES = [
   { icon: Fire, title: "Heat pain.", text: "The paths with the most people in full sun." },
   { icon: Tree, title: "Trees and shelters.", text: "Ranked by sun-minutes saved per rupee." },
@@ -45,7 +45,7 @@ export default function Login() {
         <MapView center={MAP_CENTER} zoom={MAP_ZOOM} onReady={drawPain} interactive={false} />
         {shown && (
           <div className="absolute bottom-6 left-6 z-[2] max-w-[380px] border-2 border-ink bg-white px-4 py-3 text-[13.5px] text-muted">
-            <b className="block text-[16px] text-ink">{shown.name}, Dehmi Kalan</b>
+            <b className="block text-[16px] text-ink">{shown.name || shown.label}, Dehmi Kalan</b>
             About {shown.walkersPerDay.toLocaleString("en-IN")} people a day walk this {shown.lengthM} m path. In May, {Math.round(shown.sunShare * 100)}% of it is in direct sun from 10 AM to 4 PM.
           </div>
         )}

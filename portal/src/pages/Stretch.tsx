@@ -180,7 +180,7 @@ export default function Stretch() {
             <h2 className="cond border-t-2 border-ink pt-3 text-[28px]">Who walks here</h2>
             <p className="mt-1 text-[13.5px] text-muted">Estimates; the ranking uses the total.</p>
             <div className="mt-2">
-              <WalkerRow title="From nearby places" text="Colleges, stops and shops within 400 m, weighted by distance" value={inr(evidence.walkers.poiEstimate)} />
+              <WalkerRow title="Modelled" text="Walking trips between nearby colleges, hostels, stops and shops, along the shortest paths" value={inr(evidence.walkers.poiEstimate)} />
               <WalkerRow title="From SunSkip trips" text="Trips over the last 30 days, per day" value={inr(appTripsPerDay)} />
               <WalkerRow title="People a day" text="Used for the pain score" value={inr(evidence.walkers.perDay)} total />
             </div>

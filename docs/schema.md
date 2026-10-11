@@ -133,7 +133,7 @@ Audio isn't stored in the database. It lives in S3 at `audio/{sha256(text|langua
 **`demand_estimates`** (nightly)
 
 ```
-poi_walkers_per_day = Σ weight × exp(−distance / 150 m)   for places within 400 m
+poi_walkers_per_day = walkers from the transport model (api.md §8): trips between places, walked along shortest paths
 app_trips_30d       = recent trips that used this segment (chosen option, else top option)
 walkers_per_day     = poi_walkers_per_day + app_trips_30d / 30
 ```

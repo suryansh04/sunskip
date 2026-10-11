@@ -155,6 +155,19 @@ waitSunMinutes = 0                          if the stop is shaded
 
 heatDose      = Σ over each hour of (sun minutes + wait-in-sun minutes in that hour) × max(heatWeight, 0.1)
 
+walkersPerDay  = modelled walkers + SunSkip trips that used it in the last 30 days ÷ 30
+modelled walkers: a small transport model (trip generation → distribution → assignment), app/worker/demand.py
+  1. each place and stop creates walking trip ends a day (estimates):
+       metro station 10,000  (Jaipur Metro 55,068 riders/day, July 2024, ÷ 11 stations, × on and off)
+       bus stop 1,300        (JCTSL ~125,000 riders/day ÷ ~193 stops, × 2)
+       hostel block 2,600    (MUJ 6,500 beds ÷ 10 hostel blocks in OSM = 650, × 2 walking round trips)
+       college 4,000, campus gate 2,000, e-rickshaw stand 300, food 200, shop 100, other 50
+  2. half of a place's trip ends start there; 70% go to places of another kind within 1.2 km on foot,
+     pulled by their size × e^(−walking distance / 400 m); 30% go to unmapped homes and parking, spread
+     over the paths in reach by length × the same decay
+  3. every trip is walked along the shortest path; done 8 times with path lengths varied ±15% at random and
+     averaged (Burrell's stochastic assignment), so parallel paths share the walkers
+
 painScore     = 100 × walkersPerDay × heatSunMetres ÷ (the area's worst stretch at its worst month and hour)
                 heatSunMetres = mean over the chosen hours of Σ segment length_m × sun_fraction × typicalHeatWeight
                 typicalHeatWeight[month, hour] = mean heatWeight(feels-like) over last year's days (Open-Meteo archive,
@@ -595,7 +608,7 @@ painScore     = 100 × walkersPerDay × heatSunMetres ÷ (the area's worst stret
 - **Map endpoints** (14 heat-pain, 15 recommendations) need `bbox` (max 25 km²). Stats and stretch detail don't.
 - **Defaults:** `month=5`, `hours=10-16` (May midday is the worst case).
 - **Missing cells** in the bbox (or within 60 m of simulated items) are queued as a `PORTAL` job (max 120 cells per call). Nothing is queued outside India.
-- **Walkers** come from the demand job (nightly at 02:00 IST, or by hand with `python -m app.worker.demand`). A brand-new area has none until it runs, so its pain scores are `null`.
+- **Walkers** come from the demand job (§8 formula; nightly at 02:00 IST, or by hand with `python -m app.worker.demand`, about 25 s). A brand-new area has none until it runs, so its pain scores are `null`.
 - **If nothing in the area is ready yet:** `409 SHADE_PREPARING`.
 
 ### 13. `GET /portal/stats?from=&to=`

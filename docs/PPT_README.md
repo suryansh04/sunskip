@@ -588,7 +588,7 @@ Desktop-first (1280 px+). A black top bar with four sections (**Heat pain, Trees
 - **Amazon Cognito** hosted login with the **authorization code + PKCE** flow, written by hand (~150 lines, no auth library).
 - Tokens renew a minute before they expire using the **30-day refresh token**, so officials stay signed in.
 - **"Sign in as demo user"** button for judges signs in directly through Cognito's user-pool API (`USER_PASSWORD_AUTH`).
-- **The map behind sign-in** is a real capture of the MUJ heat pain. The path its caption describes (GHs Footpath, about 1,296 people a day, 96% in sun 10 AM – 4 PM in May) is outlined and tagged "This path".
+- **The map behind sign-in** is a real capture of the MUJ heat pain. The path its caption describes (Street off GHS footpath, the worst stretch: about 1,544 people a day, 100% in sun 10 AM – 4 PM in May) is outlined and tagged "This path".
 - API Gateway checks the Cognito token on every `/portal/*` call; FastAPI never sees an unsigned portal request.
 
 ### 11.2 Heat pain (`/`)
@@ -616,7 +616,7 @@ A one-page report an official can attach to a proposal, **printable on A4**:
 - The stretch name (or description), area, length, path pieces, id.
 - Key numbers: **people walk it a day (estimate)**, **% in direct sun** (May, 10 AM – 4 PM), and **hours a day 90%+ in sun** in May.
 - **12 months × 24 hours sun grid**: every cell coloured from blue (all shade) to deep orange (all sun); blank where the sun is below 5°.
-- **Walkers breakdown:** from nearby places (colleges, hostels, gates, food and shops within 400 m, weighted by distance), from SunSkip trips (last 30 days, per day), and the total used for the pain score.
+- **Walkers breakdown:** modelled (walking trips between nearby colleges, hostels, stops and shops, along the shortest paths), from SunSkip trips (last 30 days, per day), and the total used for the pain score.
 - A **drawing of the stretch** with the paths around it.
 - **Print** button.
 
@@ -683,8 +683,13 @@ Shadiest path edge cost
     length × (1 + 3.0 × sun fraction × heat weight), detour ≤ 1.3 × shortest
 
 Walkers per day on a path piece (demand estimate, nightly)
-    Σ nearby places within 400 m: weight × e^(−distance / 150 m)
-        weights: academic 500, campus gate 400, hostel 300, food 50, shop 30, other 20
+    a transport model, the planners' standard (trip generation → distribution → assignment):
+    1. places create walking trips a day: metro station 10,000 (Jaipur Metro ridership ÷ stations),
+       bus stop 1,300 (JCTSL ridership ÷ stops), hostel block 2,600 (MUJ beds ÷ blocks), college 4,000,
+       campus gate 2,000, food 200, shop 100
+    2. trips go to other kinds of place within 1.2 km, more to bigger and nearer ones (e^(−d / 400 m));
+       30% go to unmapped homes and parking along the paths
+    3. each trip is walked along the shortest path, 8 runs with lengths varied ±15% (Burrell), averaged
     + app trips that used it in the last 30 days ÷ 30
 
 Pain score of a stretch
@@ -891,7 +896,7 @@ flowchart LR
 
 - **Shade comes from Google's model.** Tree canopies are treated as solid; there are no field checks in v1. The buildings and trees are as Google photographed them in 2025 (imagery dates Mar–Oct 2025, reported by `/meta`).
 - **Only where Google has shade data, only in India.** Elsewhere, routes and the best time (from sun angle and temperature, labelled "estimate") still work; sun minutes show "unknown".
-- **Walkers per day are estimates** from nearby places until enough app trips come in; the portal marks them as estimates.
+- **Walkers per day are estimates** from a transport model of trips between mapped places until enough app trips come in; the portal marks them as estimates.
 - **E-rickshaw fares are guesses** (₹10 + ₹10/km), only in drawn zones, always labelled.
 - **The simulator is an approximation:** no trunks, canopy gaps or growth time; only paths within 60 m of an item; up to 50 items.
 - **Minutes in direct sun**, not hot walls, wind or humidity. We never claim a route is "safe".
