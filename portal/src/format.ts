@@ -29,6 +29,13 @@ export function hourTick(hour) {
   return hour > 12 ? `${hour - 12}p` : `${hour}a`;
 }
 
+// A stretch's OSM name, else the description built from what's around it (api.md 14)
+export function stretchName(stretch) {
+  return stretch?.name || stretch?.label || "Unnamed path";
+}
+
+export const LABEL_NOTE = "No name in OpenStreetMap: described by the nearest named place or road.";
+
 export function errorMessage(err) {
   return err.response?.data?.error?.message || "Something went wrong";
 }

@@ -80,6 +80,7 @@ export type Waypoint = {
 export type StretchPain = {
   stretchId: string;
   name: string | null;
+  label: string | null; // described from what's nearby when OSM has no name
   lengthM: number;
   sunShare: number | null;
   walkersPerDay: number | null;
@@ -127,6 +128,7 @@ export type Simulation = {
 export type StretchEvidence = {
   stretchId: string;
   name: string | null;
+  label: string | null;
   lengthM: number;
   segmentIds: string[];
   sunByMonthHour: (number | null)[][];

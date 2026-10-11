@@ -11,6 +11,7 @@ from app.core.errors import ApiError
 from app.core.formulas import round_half_up, round_whole
 from app.db.demand_queries import APP_TRIPS_DAYS
 from app.db.portal_queries import load_heat_pain, load_stats, load_stretch, load_stretch_sun, load_top_origins
+from app.portal.labels import stretch_labels
 from app.shade.bbox import BBox, bbox_polygon
 from app.shade.queue import ensure_shade
 from app.shade.tiles import HOURS
@@ -45,13 +46,14 @@ async def usage_stats(start_day: date | None, end_day: date | None) -> dict:
     }
 
 
-def pain_feature(row: asyncpg.Record) -> dict:
+def pain_feature(row: asyncpg.Record, label: str | None) -> dict:
     walkers = row["walkers_per_day"]
     return {
         "type": "Feature",
         "properties": {
             "stretchId": stretch_code(row["stretch_id"]),
             "name": row["name"],
+            "label": label,
             "lengthM": round_whole(row["length_m"]),
             "sunShare": round_half_up(row["sun_share"], 2),
             "walkersPerDay": round_whole(walkers),
@@ -78,10 +80,11 @@ async def ready_pain_rows(box: BBox, month: int, hours: tuple[int, int], limit: 
 
 async def heat_pain(box: BBox, month: int, hours: tuple[int, int], limit: int) -> dict:
     rows, shade = await ready_pain_rows(box, month, hours, limit)
+    labels = await stretch_labels([row["stretch_id"] for row in rows])
     return {
         "shade": shade.model_dump(mode="json", by_alias=True),
         "type": "FeatureCollection",
-        "features": [pain_feature(row) for row in rows],
+        "features": [pain_feature(row, labels.get(row["stretch_id"])) for row in rows],
     }
 
 
@@ -95,6 +98,7 @@ async def stretch_evidence(code: str) -> dict:
     return {
         "stretchId": code,
         "name": stretch["name"],
+        "label": (await stretch_labels([stretch["id"]])).get(stretch["id"]),
         "lengthM": round_whole(stretch["length_m"]),
         "segmentIds": [segment_code(segment_id) for segment_id in stretch["segment_ids"]],
         "sunByMonthHour": grid,

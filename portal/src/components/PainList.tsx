@@ -1,5 +1,5 @@
 import { BANDS, bandOf } from "../bands";
-import { inr, pct } from "../format";
+import { LABEL_NOTE, inr, pct, stretchName } from "../format";
 
 // Stretches grouped into Severe / High / Moderate / Low / Unknown bands, worst first.
 // Each row: rank, name, % in sun, length, people a day, pain. Hover and click are the page's.
@@ -30,7 +30,9 @@ export default function PainList({ rows, hover, onHover, onOpen }) {
             >
               <span className="num text-[23px] leading-none">{row.rank}</span>
               <span className="min-w-0">
-                <b className={`block truncate text-[15px] ${row.name ? "font-[650]" : "font-medium text-muted"}`}>{row.name || "Unnamed path"}</b>
+                <b title={row.name ? undefined : LABEL_NOTE} className={`block truncate text-[15px] ${row.name ? "font-[650]" : "font-medium text-[#4A4038]"}`}>
+                  {stretchName(row)}
+                </b>
                 <small className="text-[12.5px] text-muted">{pct(row.sunShare)} in direct sun</small>
               </span>
               <span className="text-right text-[14px] leading-tight">
