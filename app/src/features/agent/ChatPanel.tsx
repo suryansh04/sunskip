@@ -13,6 +13,15 @@ const SUGGESTIONS = [
   { text: "6 बजे कितनी धूप होगी?", lang: "hi" },
 ];
 
+const LIMIT_REACHED = 429;
+
+// What to tell the walker when a question gets no answer
+function failureNote(err) {
+  if (!err.response) return "Can't reach SunSkip. Check your internet connection and ask again.";
+  if (err.response.status === LIMIT_REACHED) return "SunSkip has answered all the questions it can for today. Try again tomorrow.";
+  return "SunSkip couldn't answer that right now. Ask again in a moment.";
+}
+
 // Ask SunSkip (screens 20 to 22): a full-screen chat over POST /agent/chat, with the mic from features/voice.
 // Props: tripId (the trip the answers are about, or null), location ({ lat, lng } or null),
 // about (one line saying what the answers use), listen (start by listening) and onClose.
@@ -43,14 +52,15 @@ export default function ChatPanel({ tripId, location, about, listen, onClose }) 
     setText("");
     setThinking(true);
     api
-      .post("/agent/chat", { sessionId, message: question, language, location, tripId, speak: true })
+      // Only a spoken question needs its answer voiced straight away; Play voices a typed one on tap
+      .post("/agent/chat", { sessionId, message: question, language, location, tripId, speak: seconds !== undefined })
       .then((res) => {
         setSessionId(res.data.sessionId);
         add({ from: "agent", ...res.data });
         // A question asked by voice is answered by voice
         if (seconds !== undefined) say(res.data.reply, res.data.replyLanguage, res.data.audioUrl);
       })
-      .catch((err) => add({ from: "note", text: err.response ? "SunSkip couldn't answer that right now. Ask again in a moment." : "Can't reach SunSkip. Check your internet connection and ask again." }))
+      .catch((err) => add({ from: "note", text: failureNote(err) }))
       .finally(() => setThinking(false));
   }
 

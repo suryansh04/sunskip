@@ -106,17 +106,19 @@ class Settings(BaseSettings):
     voice_max_steps: int = 30
     voice_parallel_calls: int = 10
     voice_budget_s: float = 20  # steps not spoken by then are read by the app
-    voice_calls_per_device_per_day: int = 60
-    voice_calls_per_day: int = 3000
+    voice_calls_per_device_per_day: int = 20
+    voice_calls_per_day: int = 200
     claude_model: str = "claude-sonnet-5-5"
     agent_max_tool_rounds: int = 4
     agent_max_retries: int = 2
     agent_history_messages: int = 20
     agent_budget_s: float = 16  # stop asking Claude after this and answer from the numbers
-    agent_max_tokens: int = 400
+    agent_max_tokens: int = 600
+    agent_max_words: int = 75  # the prompt asks for under 60; longer replies are sent back once to be shortened
+    agent_speak_by_s: float = 22  # answers ready later than this go without Bulbul's voice
     agent_number_tolerance: float = 1
-    agent_questions_per_device_per_day: int = 30
-    agent_questions_per_day: int = 1000
+    agent_questions_per_device_per_day: int = 10
+    agent_questions_per_day: int = 100
 
     # Worker and api background loops
     heartbeat_interval_s: float = 30

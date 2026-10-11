@@ -3,8 +3,9 @@ Times are written like "5 PM", the way people say them, so a reply's numbers can
 
 from datetime import datetime
 
-from app.config import IST
+from app.config import IST, settings
 from app.contracts.models import BestTimeResponse, Conditions, Leg, PlanResponse, RouteOption
+from app.core.sun import sun_elevations
 
 MODE_WORDS = {"WALK": "walk", "BUS": "bus", "METRO": "metro", "RAIL": "train", "ERICKSHAW": "e-rickshaw"}
 NOON = 12
@@ -106,6 +107,10 @@ def conditions_summary(conditions: Conditions) -> str:
     return f"It feels like {conditions.feels_like_c} C now.{alert}"
 
 
+def sun_is_up(lat: float, lng: float, moment: datetime) -> bool:
+    return sun_elevations(lat, lng, [moment])[0] >= settings.min_sun_elevation_deg
+
+
 def leg_facts(option: RouteOption, number: int) -> str:
     leg = option.legs[number - 1]
     start, end = leg.from_.name or "the start", leg.to.name or "the end"
@@ -113,6 +118,10 @@ def leg_facts(option: RouteOption, number: int) -> str:
         f"Leg {number} of option {option.option_id}: {leg_words(leg)} from {start} to {end}, {leg.distance_meters} m"
     )
     if leg.mode == "WALK" and leg.exposure:
+        start_at = leg.from_.location
+        if not sun_is_up(start_at.lat, start_at.lng, leg.start_at):
+            # Our data counts every path as shaded once the sun is down; that is darkness, not shade
+            return f"{words}; the sun is down at {clock(leg.start_at)}, so there is no direct sun on it then."
         shade = "shade unknown" if leg.exposure.shade_pct is None else f"{leg.exposure.shade_pct}% in shade"
         return f"{words}; {minutes(leg.exposure.sun_minutes, 'in direct sun')}; {shade}."
     if leg.wait_seconds is not None:

@@ -9,7 +9,7 @@ Builds api.md endpoints 9–12, which the app's chat, mic and spoken directions 
 - **Hindi:** Claude reads the question as typed (Hindi, Hinglish or English) and answers in English (the number check runs on it); Sarvam translates only the answer to Hindi. This replaces api.md step 1 (translate the question first).
 - **Sarvam** (plain httpx, no SDK): speech-to-text `saaras:v3` (`transcribe`), translate `mayura:v1` (digits kept 0–9), text-to-speech `bulbul:v3`, voice `priya`, MP3.
 - **Audio cache:** S3 `audio/{sha256}.mp3` + `.txt` (the spoken text), presigned for 1 h. Made once per sentence, language and voice.
-- **Caps (in memory; one api process):** voice 60 calls per device and 3,000 in total per day; agent 30 questions per device and 1,000 in total per day. Cached audio doesn't count. Over the cap: `429 RATE_LIMITED`.
+- **Caps (in memory; one api process):** voice 20 calls per device and 200 in total per day; agent 10 questions per device and 100 in total per day (lowered for the demo). Cached audio doesn't count. Over the cap: `429 RATE_LIMITED`.
 - **Agent plans** are real trips: `plan_route` runs the normal planner, so they are saved and logged like any plan.
 - **No schema change:** sessions use the existing `agent_sessions` / `agent_messages` tables.
 

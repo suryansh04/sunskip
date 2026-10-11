@@ -1,5 +1,6 @@
 """Ask SunSkip (api.md endpoint 9): Claude with SunSkip's own tools, a number check, then Hindi and voice."""
 
+import asyncio
 import logging
 import time
 from datetime import datetime
@@ -8,7 +9,7 @@ import anthropic
 import httpx
 
 from app.agent.check import problems_with
-from app.agent.facts import clock, option_line
+from app.agent.facts import clock, option_line, sun_is_up
 from app.agent.tools import TOOLS, ToolContext, run_tool
 from app.config import IST, settings
 from app.contracts.models import AgentChatRequest, AgentChatResponse, PlanRequest, RouteOption
@@ -30,7 +31,9 @@ _claude: anthropic.AsyncAnthropic | None = None
 RULES = """You are SunSkip's assistant. SunSkip helps people in India walk and take buses, metros and e-rickshaws \
 with fewer minutes in direct sun.
 - The user may write in Hindi, Hinglish or English. Always write your answer in plain English (never Hindi or \
-Hinglish), in under 60 words, plainly and kindly: SunSkip translates it into the user's language.
+Hinglish), in at most 3 short sentences (under 60 words), plainly and kindly: SunSkip translates it into the \
+user's language. Give the one or two numbers that answer the question, not every option.
+- Write plain sentences only: no markdown, bullet points, bold text or headings. The answer is read aloud.
 - Use only numbers that appear in the tool results or in the trip below. Never estimate or make up a number.
 - Say times like "5 PM". Say minutes like "7.6 min".
 - Never use the word "safe". Give no medical advice.
@@ -66,6 +69,8 @@ async def trip_context(context: ToolContext) -> str:
 def system_prompt(context: ToolContext, trip: str) -> str:
     now = datetime.now(IST)
     where = "The user's location is known." if context.location else "The user's location is not known."
+    if context.location and not sun_is_up(context.location.lat, context.location.lng, now):
+        where += " The sun is down there now: a walk now has no direct sun, which is not the same as shade."
     return f"{RULES}\n\nNow: {now:%A %d %B}, {clock(now)} IST. {where}{trip}"
 
 
@@ -81,7 +86,9 @@ def recent_history(messages: list[dict]) -> list[dict]:
     return messages
 
 
-async def ask_claude(system: str, messages: list[dict]) -> anthropic.types.Message:
+async def ask_claude(system: str, messages: list[dict], timeout_s: float) -> anthropic.types.Message:
+    # Thinking only between tool calls: by default this model thinks before answering too, and that thinking can use
+    # the whole token budget and leave no answer (and takes seconds a walker doesn't have)
     async with track_service("claude"):
         return await claude().messages.create(
             model=settings.claude_model,
@@ -89,6 +96,8 @@ async def ask_claude(system: str, messages: list[dict]) -> anthropic.types.Messa
             system=system,
             messages=messages,
             tools=TOOLS,
+            thinking={"type": "between_tools"},
+            timeout=timeout_s,
         )
 
 
@@ -101,14 +110,14 @@ def text_of(message: anthropic.types.Message) -> str:
 
 
 async def answer_tools(message: anthropic.types.Message, context: ToolContext, used: list[str]) -> dict:
-    """Runs the tools Claude asked for (one after another: a planned trip feeds the next tool) as one user turn."""
-    results = []
-    for block in message.content:
-        if block.type != "tool_use":
-            continue
-        used.append(block.name)
-        text, failed = await run_tool(block.name, block.input, context)
-        results.append({"type": "tool_result", "tool_use_id": block.id, "content": text, "is_error": failed})
+    """Runs the tools Claude asked for, side by side (each names its own places), as one user turn."""
+    calls = [block for block in message.content if block.type == "tool_use"]
+    used += [call.name for call in calls]
+    answers = await asyncio.gather(*(run_tool(call.name, call.input, context) for call in calls))
+    results = [
+        {"type": "tool_result", "tool_use_id": call.id, "content": text, "is_error": failed}
+        for call, (text, failed) in zip(calls, answers, strict=True)
+    ]
     return {"role": "user", "content": results}
 
 
@@ -117,8 +126,8 @@ async def converse(system: str, turns: list[dict], context: ToolContext, questio
     with the exchange. A rejected reply and its correction are sent once, then dropped, so they're never saved."""
     started, used, retries, rounds, correction = time.monotonic(), [], 0, 0, []
     sources = [system, question, *context.summaries]  # the prompt holds the time and the trip
-    while time.monotonic() - started < settings.agent_budget_s:
-        message = await ask_claude(system, turns + correction)
+    while (left_s := settings.agent_budget_s - (time.monotonic() - started)) > 0:
+        message = await ask_claude(system, turns + correction, min(settings.outside_call_timeout_s, left_s))
         if message.stop_reason == "tool_use":
             rounds += 1
             if rounds > settings.agent_max_tool_rounds:
@@ -129,7 +138,7 @@ async def converse(system: str, turns: list[dict], context: ToolContext, questio
             sources += [str(turns[-1]["content"]), *context.summaries]
             continue
         reply = text_of(message)
-        problem = problems_with(reply, sources)
+        problem = problems_with(reply, sources, cut_off=message.stop_reason == "max_tokens")
         if not problem:
             turns.append({"role": "assistant", "content": [{"type": "text", "text": reply}]})
             return reply, used
@@ -169,6 +178,7 @@ async def open_session(request: AgentChatRequest, client_hash: str) -> tuple:
 
 
 async def chat(request: AgentChatRequest, client_hash: str) -> AgentChatResponse:
+    started = time.monotonic()
     session_id, history = await open_session(request, client_hash)
     context = ToolContext(client_hash=client_hash, location=request.location, trip_id=request.trip_id)
     system = system_prompt(context, await trip_context(context))
@@ -187,7 +197,9 @@ async def chat(request: AgentChatRequest, client_hash: str) -> AgentChatResponse
     else:
         turns = turns[len(history) :]
     reply, reply_language = await in_language(english, request.language)
-    spoken = await speak(reply, reply_language, from_english=False) if request.speak else None
+    # A late answer goes without our voice (the app speaks it itself), so the request stays under the gateway's 29 s
+    on_time = time.monotonic() - started < settings.agent_speak_by_s
+    spoken = await speak(reply, reply_language, from_english=False) if request.speak and on_time else None
     await save_messages(session_id, turns, request.message, request.language)
     return AgentChatResponse(
         session_id=session_id,

@@ -8,6 +8,7 @@ from app.config import settings
 NUMBER = re.compile(r"\d+(?:\.\d+)?")
 THOUSANDS = re.compile(r"(?<=\d),(?=\d{3}\b)")  # "1,200" is one number
 SAFE_WORD = re.compile(r"\bsafe", re.IGNORECASE)
+MARKDOWN = re.compile(r"\*\*|__|^\s*(?:[-*•]|\d+\.)\s|^\s*#", re.MULTILINE)
 QUIET = "Reply with the new answer only; don't apologise or mention this note."
 
 
@@ -25,8 +26,12 @@ def unbacked_numbers(reply: str, sources: list[str]) -> list[float]:
     ]
 
 
-def problems_with(reply: str, sources: list[str]) -> str | None:
+def problems_with(reply: str, sources: list[str], cut_off: bool) -> str | None:
     """What is wrong with the reply, in words Claude can act on, or None when it can be sent."""
+    if cut_off or not reply:
+        return "Your answer was cut off. Answer again in under 60 words. " + QUIET
+    if len(reply.split()) > settings.agent_max_words or MARKDOWN.search(reply):
+        return "Rewrite the answer in under 60 words, as plain sentences with no lists, bold or headings. " + QUIET
     if SAFE_WORD.search(reply):
         return "Rewrite the answer without the word 'safe' or 'safety'; give minutes in direct sun instead. " + QUIET
     wrong = unbacked_numbers(reply, sources)
