@@ -9,6 +9,10 @@ const RENEW_EARLY_MS = 60000; // renew a minute before the ID token runs out
 // Locally against our own API there is no login (API Gateway is what checks the token)
 export const loginNeeded = Boolean(CLIENT_ID);
 
+// A shared demo account for judges, shown on the sign-in page. Set at build time; its password is public on purpose.
+export const DEMO = { email: import.meta.env.VITE_DEMO_EMAIL, password: import.meta.env.VITE_DEMO_PASSWORD };
+const USER_POOL_API = `https://cognito-idp.${DOMAIN?.match(/auth\.([a-z0-9-]+)\.amazoncognito/)?.[1]}.amazonaws.com/`;
+
 function base64url(bytes: ArrayBuffer | Uint8Array) {
   return btoa(String.fromCharCode(...new Uint8Array(bytes)))
     .replace(/\+/g, "-")
@@ -47,6 +51,23 @@ async function requestTokens(fields) {
   return res.json();
 }
 
+// The demo signs in through Cognito's user-pool API (no hosted page), so it renews there too
+async function callUserPool(action, body) {
+  const res = await fetch(USER_POOL_API, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-amz-json-1.1", "X-Amz-Target": `AWSCognitoIdentityProviderService.${action}` },
+    body: JSON.stringify({ ClientId: CLIENT_ID, ...body }),
+  });
+  if (!res.ok) throw new Error("Sign-in failed");
+  const result = (await res.json()).AuthenticationResult;
+  return { id_token: result.IdToken, expires_in: result.ExpiresIn, refresh_token: result.RefreshToken };
+}
+
+export async function demoLogin() {
+  saveTokens(await callUserPool("InitiateAuth", { AuthFlow: "USER_PASSWORD_AUTH", AuthParameters: { USERNAME: DEMO.email, PASSWORD: DEMO.password } }));
+  localStorage.setItem("signedInDirectly", "1");
+}
+
 function saveTokens(tokens) {
   localStorage.setItem("idToken", tokens.id_token);
   localStorage.setItem("idTokenExp", String(Date.now() + tokens.expires_in * 1000));
@@ -54,7 +75,7 @@ function saveTokens(tokens) {
 }
 
 function forgetTokens() {
-  for (const key of ["idToken", "idTokenExp", "refreshToken"]) localStorage.removeItem(key);
+  for (const key of ["idToken", "idTokenExp", "refreshToken", "signedInDirectly"]) localStorage.removeItem(key);
 }
 
 // On /callback: swap the one-time code for tokens. Returns the page to go back to.
@@ -75,7 +96,12 @@ export function freshToken(): Promise<string | null> {
   if (token && Date.now() < Number(localStorage.getItem("idTokenExp")) - RENEW_EARLY_MS) return Promise.resolve(token);
   const refreshToken = localStorage.getItem("refreshToken");
   if (!refreshToken) return Promise.resolve(null);
-  renewing ??= requestTokens({ grant_type: "refresh_token", refresh_token: refreshToken })
+  // One renewal at a time: calls that arrive while it runs wait for the same answer
+  renewing ??= (
+    localStorage.getItem("signedInDirectly")
+      ? callUserPool("InitiateAuth", { AuthFlow: "REFRESH_TOKEN_AUTH", AuthParameters: { REFRESH_TOKEN: refreshToken } })
+      : requestTokens({ grant_type: "refresh_token", refresh_token: refreshToken })
+  )
     .then((tokens) => {
       saveTokens(tokens);
       return tokens.id_token;

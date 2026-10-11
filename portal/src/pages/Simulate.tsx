@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { useLocation, useOutletContext } from "react-router";
-import { ArrowCounterClockwise, ArrowsClockwise, HourglassMedium, Play, WarningCircle } from "@phosphor-icons/react";
+import { ArrowsClockwise, HourglassMedium, WarningCircle } from "@phosphor-icons/react";
 import { api } from "../api/client";
 import { PAIN_COLOR } from "../bands";
 import { COST_SOURCES, DEFAULT_SHELTER, DEFAULT_TREE, itemCost } from "../costs";
-import { asRequest, boxAround, itemsFor, newItem } from "../simItems";
+import { asRequest, boxAround, itemsFor, newItem, planNote } from "../simItems";
 import { MONTHS, errorMessage, inr, reducedMotion, stretchName } from "../format";
 import { fitTo, flatCoords, setSource, showLayers } from "../map";
 import { footprint, itemBlocks } from "../shapes";
@@ -12,6 +12,7 @@ import PanelHead from "../components/PanelHead";
 import ItemEditor from "../components/ItemEditor";
 import SimResult from "../components/SimResult";
 import SimOverlays from "../components/SimOverlays";
+import SimFooter from "../components/SimFooter";
 import MonthPicker from "../components/MonthPicker";
 import StateMessage from "../components/StateMessage";
 
@@ -27,6 +28,7 @@ export default function Simulate() {
   const location = useLocation();
   const start = location.state || {};
   const [rec, setRec] = useState(null);
+  const [fromRec, setFromRec] = useState(true); // false after Start empty
   const [name, setName] = useState("");
   const [stretchLine, setStretchLine] = useState(null);
   const [items, setItems] = useState([]);
@@ -60,6 +62,7 @@ export default function Simulate() {
         const all = recRes ? recRes.data.recommendations : [];
         const chosen = given || all.find((candidate) => candidate.stretchId === start.stretchId) || all[0] || null;
         setRec(chosen);
+        setFromRec(true);
         setItems(chosen ? itemsFor(chosen) : []);
         setName(chosen ? stretchName(stretches[chosen.stretchId]?.properties) : "");
         setStretchLine(chosen ? stretches[chosen.stretchId]?.geometry || null : null);
@@ -137,7 +140,7 @@ export default function Simulate() {
         return;
       }
       const to = { lat: event.lngLat.lat, lng: event.lngLat.lng };
-      setItems((all) => all.map((item, i) => (i === dragging ? { ...item, location: to } : item)));
+      setItems((all) => all.map((item, i) => (i === dragging ? { ...item, location: to, proposed: false } : item)));
       setDirty(true);
     };
     const up = () => {
@@ -192,7 +195,7 @@ export default function Simulate() {
   }
 
   function edit(patch) {
-    setItems(items.map((item, i) => (i === sel ? { ...item, ...patch } : item)));
+    setItems(items.map((item, i) => (i === sel ? { ...item, ...patch, proposed: false } : item)));
     setDirty(true);
   }
 
@@ -208,11 +211,23 @@ export default function Simulate() {
   }
 
   function reset() {
+    setFromRec(true);
     setItems(rec ? itemsFor(rec) : []);
     setSel(null);
     setResult(null);
     setDirty(false);
     setStatus("idle");
+  }
+
+  // A blank map: nothing proposed, the official plants their own
+  function startEmpty() {
+    setFromRec(false);
+    setItems([]);
+    setSel(null);
+    setResult(null);
+    setDirty(false);
+    setStatus("idle");
+    setTool("TREE");
   }
 
   function run() {
@@ -244,13 +259,14 @@ export default function Simulate() {
   }
 
   const count = (type) => items.filter((item) => item.type === type).length;
+  const note = planNote(items, rec && fromRec ? rec : null);
   const cost = items.reduce((sum, item) => sum + itemCost(item), 0);
   const selected = items[sel];
 
   return (
     <aside className="flex min-h-0 flex-col border-l-2 border-ink bg-white">
       <PanelHead title="Simulator">
-        {rec ? `Starting from recommendation ${rec.rank}: ${name}. Move, add or resize items, then run it.` : "Add trees or shelters on a path, then run it to see the shade they add."}
+        {rec && fromRec ? `Starting from recommendation ${rec.rank}: ${name}. Move, add or resize items, then run it.` : "Add trees or shelters on a path, then run it to see the shade they add."}
       </PanelHead>
       <div className="flex border-b border-line">
         {[
@@ -298,21 +314,14 @@ export default function Simulate() {
         {status !== "loading" && <p className="px-6.5 pt-2 pb-5 text-[11.5px] leading-normal text-muted">{COST_SOURCES}</p>}
       </div>
 
-      <div className="flex border-t-2 border-ink">
-        <button
-          type="button"
-          onClick={run}
-          disabled={!items.length || status === "running" || status === "loading"}
-          className="flex min-h-14 flex-1 items-center justify-center gap-2 bg-ink text-[16px] font-bold text-white hover:bg-[#2E2723] disabled:opacity-40"
-        >
-          <Play size={18} weight="fill" />
-          {status === "done" && !dirty ? "Run again" : "Run simulation"}
-        </button>
-        <button type="button" onClick={reset} className="flex min-h-14 w-[120px] items-center justify-center gap-2 bg-white font-bold shadow-[inset_0_0_0_2px_var(--color-ink)] hover:bg-hover">
-          <ArrowCounterClockwise size={18} weight="bold" />
-          Reset
-        </button>
-      </div>
+      <SimFooter
+        canRun={items.length > 0 && status !== "running" && status !== "loading"}
+        ranAgain={status === "done" && !dirty}
+        canReset={Boolean(rec)}
+        onRun={run}
+        onReset={reset}
+        onStartEmpty={startEmpty}
+      />
 
       <SimOverlays
         tool={tool}
@@ -325,6 +334,7 @@ export default function Simulate() {
         onTreeKind={setTreeKind}
         shelterKind={shelterKind}
         onShelterKind={setShelterKind}
+        planNote={note}
       />
     </aside>
   );

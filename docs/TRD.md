@@ -392,6 +392,7 @@ We use **Cognito's hosted login page** with a redirect and the **authorization c
 - **Guard:** every route but `/login` and `/callback` needs a session; otherwise the sign-in page opens and returns to the page asked for.
 - **Sign out:** clears the tokens and goes through Cognito's `/logout`.
 - **Locally against our own API** there is no login (`VITE_COGNITO_CLIENT_ID` unset): API Gateway is what checks the token.
+- **Demo account for judges:** when `VITE_DEMO_EMAIL` and `VITE_DEMO_PASSWORD` are set at build time, the sign-in page shows them with copy buttons and a "Sign in as demo" button. It signs in through Cognito's user-pool API (`InitiateAuth` with `USER_PASSWORD_AUTH`, renewed with `REFRESH_TOKEN_AUTH`), so the app client also allows `ALLOW_USER_PASSWORD_AUTH`. The demo password is public on purpose and is not committed: it is only in the build environment. Remove the user (or the variables) after judging.
 - **Cognito setup:**
   - user pool + app client `sunskip-portal-web` (public, no secret);
   - OAuth flow **code** only, scopes `openid email`, `ALLOW_REFRESH_TOKEN_AUTH`; ID and access tokens 60 min, refresh token 30 days, token revocation on;

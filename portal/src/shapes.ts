@@ -4,8 +4,8 @@
 const METERS_PER_DEG = 111320;
 const TRUNK = "#7A5A3E";
 const POST = "#3A302A";
-const LEAF = { normal: ["#5E9447", "#4F7F3A"], selected: ["#7DB862", "#6AA64F"] };
-const ROOF = { normal: "#1E6FD9", selected: "#2F80ED" };
+const LEAF = { normal: ["#5E9447", "#4F7F3A"], proposed: ["#9CC487", "#86B472"], selected: ["#7DB862", "#6AA64F"] };
+const ROOF = { normal: "#1E6FD9", proposed: "#8DB8F2", selected: "#2F80ED" };
 const ROOF_THICK_M = 0.2;
 const POST_INSET_M = 0.3;
 const POST_SIZE_M = 0.18;
@@ -38,7 +38,7 @@ function block(index, polygon, base, top, color) {
   return { type: "Feature", properties: { index, base, top, color }, geometry: { type: "Polygon", coordinates: polygon } };
 }
 
-// `grow` (0–1) raises a new item out of the ground
+// `grow` (0–1) raises a new item out of the ground; a recommendation's items nobody has touched yet are lighter
 export function itemBlocks(item, index, selected, grow = 1) {
   const center = [item.location.lng, item.location.lat];
   if (item.type === "TREE") {
@@ -46,7 +46,7 @@ export function itemBlocks(item, index, selected, grow = 1) {
     const top = item.heightM * grow;
     const crownBase = Math.max(1.6, item.heightM - 1.7 * radius) * grow;
     const step = (top - crownBase) / 3;
-    const [leaf, leafDark] = selected ? LEAF.selected : LEAF.normal;
+    const [leaf, leafDark] = selected ? LEAF.selected : item.proposed ? LEAF.proposed : LEAF.normal;
     return [
       block(index, circle(center, Math.max(0.25, radius * 0.09), 8), 0, crownBase + step * 0.5, TRUNK),
       block(index, circle(center, radius * 0.78), crownBase, crownBase + step, leafDark),
@@ -67,7 +67,7 @@ export function itemBlocks(item, index, selected, grow = 1) {
     const at = offset(center, Math.sin(turn) * alongM + Math.cos(turn) * acrossM, Math.cos(turn) * alongM - Math.sin(turn) * acrossM);
     return block(index, rect(at, POST_SIZE_M, POST_SIZE_M, 0), 0, top - ROOF_THICK_M, POST);
   });
-  return [...posts, block(index, rect(center, item.widthM, item.lengthM, item.bearingDeg), top - ROOF_THICK_M, top, selected ? ROOF.selected : ROOF.normal)];
+  return [...posts, block(index, rect(center, item.widthM, item.lengthM, item.bearingDeg), top - ROOF_THICK_M, top, selected ? ROOF.selected : item.proposed ? ROOF.proposed : ROOF.normal)];
 }
 
 // The dark patch on the ground under the selected item
