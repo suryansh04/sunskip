@@ -14,6 +14,7 @@ const SUGGESTIONS = [
 ];
 
 const LIMIT_REACHED = 429;
+const MAX_QUESTION_CHARS = 500; // /agent/chat turns away longer questions (400)
 
 // What to tell the walker when a question gets no answer
 function failureNote(err) {
@@ -50,6 +51,8 @@ export default function ChatPanel({ tripId, location, about, listen, onClose }) 
   function ask(question, seconds = undefined) {
     add({ from: "me", text: question, seconds });
     setText("");
+    // A long voice question: the API would refuse it, and "ask again" wouldn't help
+    if (question.length > MAX_QUESTION_CHARS) return add({ from: "note", text: "That question is too long for SunSkip. Ask it in fewer words." });
     setThinking(true);
     api
       // Only a spoken question needs its answer voiced straight away; Play voices a typed one on tap
@@ -135,6 +138,7 @@ export default function ChatPanel({ tripId, location, about, listen, onClose }) 
               onChange={(event) => setText(event.target.value)}
               placeholder="Ask in Hindi or English"
               autoComplete="off"
+              maxLength={MAX_QUESTION_CHARS}
               className="min-h-[52px] min-w-0 flex-1 rounded-[14px] border border-line bg-white px-3.5 text-[16px] text-ink placeholder:text-muted"
             />
             {typed && (
