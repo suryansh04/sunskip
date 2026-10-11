@@ -5,7 +5,7 @@ from datetime import datetime
 
 from app.config import IST, settings
 from app.contracts.models import BestTimeResponse, Conditions, Leg, PlanResponse, RouteOption
-from app.core.formulas import NOON, hour_label
+from app.core.formulas import NOON, hour_label, round_whole
 from app.core.sun import sun_elevations
 
 MODE_WORDS = {"WALK": "walk", "BUS": "bus", "METRO": "metro", "RAIL": "train", "ERICKSHAW": "e-rickshaw"}
@@ -22,7 +22,7 @@ def clock(moment: datetime) -> str:
 
 
 def whole_minutes(seconds: int) -> int:
-    return round(seconds / SECONDS_PER_MINUTE)
+    return round_whole(seconds / SECONDS_PER_MINUTE)
 
 
 def minutes(value: float | None, what: str) -> str:
