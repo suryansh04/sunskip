@@ -15,7 +15,7 @@ from app.db.demand_queries import APP_TRIPS_DAYS
 from app.db.portal_queries import load_heat_pain, load_stats, load_stretch, load_stretch_sun, load_top_origins
 from app.portal.labels import stretch_labels
 from app.shade.bbox import BBox, bbox_polygon
-from app.shade.queue import ensure_shade
+from app.shade.queue import PORTAL_CLIENT, ensure_shade
 from app.shade.tiles import HOURS
 
 DEFAULT_STATS_DAYS = 30
@@ -81,7 +81,7 @@ async def area_heat_weights(box: BBox) -> list[float]:
 
 async def ready_pain_rows(box: BBox, month: int, hours: tuple[int, int], limit: int) -> tuple[list, Shade]:
     """Ranked stretches in the area. Queues missing shade; 409 if nothing is ready yet, 422 if there's no data."""
-    shade = await ensure_shade(bbox_polygon(box), 0, "PORTAL", None)
+    shade = await ensure_shade(bbox_polygon(box), 0, "PORTAL", PORTAL_CLIENT)
     rows = await load_heat_pain(box, month, hours, limit, await area_heat_weights(box))
     if rows:
         return rows, shade

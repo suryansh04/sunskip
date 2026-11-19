@@ -1,5 +1,6 @@
 """The agent's four tools (api.md endpoint 9). Each runs the same logic as an endpoint and answers in plain text."""
 
+import logging
 from dataclasses import dataclass, field
 from datetime import datetime, time
 from uuid import UUID
@@ -167,6 +168,8 @@ async def explain_segment(tool_input: dict, context: ToolContext) -> str:
     return facts
 
 
+logger = logging.getLogger(__name__)
+
 RUNNERS = {
     "plan_route": plan_route,
     "find_best_time": best_time,
@@ -181,5 +184,9 @@ async def run_tool(name: str, tool_input: dict, context: ToolContext) -> tuple[s
         return await RUNNERS[name](tool_input, context), False
     except ApiError as error:
         return f"Could not answer: {error.message}", True
-    except (KeyError, ValueError):
+    except (KeyError, ValueError, TypeError):
         return "Could not answer: a place or time in the question wasn't clear", True
+    except Exception:
+        # A timeout or database error inside a tool: Claude can still apologise or answer from what it has
+        logger.exception("Agent tool %s failed", name)
+        return "Could not answer: that service isn't answering right now", True

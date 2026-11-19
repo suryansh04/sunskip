@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     corridor_buffer_m: float = 100
     max_cells_per_job: int = 120
     max_new_cells_per_client_per_day: int = 60
+    max_new_cells_portal_per_day: int = 240  # shared by every signed-in official (the demo account is public)
     max_shade_map_km2: float = 1
     solar_monthly_call_budget: int = 6500
     worker_solar_concurrency: int = 4
@@ -136,6 +137,11 @@ class Settings(BaseSettings):
     agent_number_tolerance: float = 1
     agent_questions_per_device_per_day: int = 10
     agent_questions_per_day: int = 100
+    plans_per_device_per_day: int = 150  # each plan is a few Google Routes calls
+    plans_per_day: int = 5000
+    cap_devices_per_ip: int = 10  # a campus shares one IP: it gets this many devices' worth of each daily cap
+    requests_per_ip_per_minute: int = 300
+    public_docs: bool = False  # /docs and /openapi.json; on for local work, off in production
 
     # Worker and api background loops
     heartbeat_interval_s: float = 30

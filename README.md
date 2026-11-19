@@ -133,7 +133,7 @@ flowchart LR
 | AI and voice | Claude (trip assistant), Sarvam AI (speech-to-text, translation, text-to-speech) |
 | Data sources | Google Solar, Routes and Air Quality APIs, Open-Meteo, OpenStreetMap (Overpass) |
 | AWS | EC2 (Docker Compose), RDS, S3, API Gateway, Cognito, Amplify, Secrets Manager |
-| CI | GitHub Actions: ruff on the API, type-checked builds of both front ends |
+| CI | GitHub Actions: ruff and pytest on the API, type-checked builds of both front ends |
 
 ## Run locally
 
@@ -160,6 +160,7 @@ uvicorn app.main:app --reload                           # http://127.0.0.1:8000/
 | `SARVAM_API_KEY` | Sarvam AI, for voice |
 | `AGENT_LIVE`, `VOICE_LIVE` | Turn on the live assistant and voice endpoints |
 | `S3_BUCKET`, `AWS_REGION`, `SECRET_ID` | Shade file storage and Secrets Manager (production) |
+| `PUBLIC_DOCS` | `true` serves `/docs` (keep it off in production) |
 
 For real data, set `GOOGLE_API_KEY` and `USE_FAKES=false`, run `python -m app.worker` in a second terminal, then `python -m scripts.preload --area muj`.
 
@@ -195,7 +196,7 @@ npm run dev          # http://localhost:5174
 **Before pushing**, run the same checks as CI:
 
 ```bash
-(cd api && ruff check . && ruff format --check .)
+(cd api && ruff check . && ruff format --check . && pytest -q)
 (cd app && npm run build)
 (cd portal && npm run build)
 ```

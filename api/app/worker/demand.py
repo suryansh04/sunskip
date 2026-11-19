@@ -126,7 +126,7 @@ def model_walkers(rows: list, places: list) -> dict[int, float]:
 async def compute_demand() -> None:
     rows = await load_walk_graph()
     places = await load_trip_places(settings.demand_snap_m)
-    walkers = model_walkers(rows, places)
+    walkers = await asyncio.to_thread(model_walkers, rows, places)  # minutes of CPU: keep the heartbeat going
     await save_demand({row["id"]: walkers.get(row["id"], 0.0) for row in rows})
     logger.info("Demand estimates updated: %d places, %d segments", len(places), len(rows))
 

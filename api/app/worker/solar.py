@@ -23,6 +23,7 @@ SOLAR_URL = "https://solar.googleapis.com/v1/dataLayers:get"
 SOLAR_RADIUS_M = 100  # a 200 x 200 m tile, enough to cover one ~150 m cell
 DOWNLOAD_TIMEOUT_S = 60  # each GeoTIFF is a few MB
 MAX_ATTEMPTS = 3
+RETRY_BACKOFF_S = 5  # wait 5 s, then 10 s, between attempts at a cell
 DOWNLOAD_TRIES = 3
 QUOTA_STATUS = 429
 SECONDS_PER_MINUTE = 60
@@ -91,41 +92,60 @@ async def download_layer(url: str) -> bytes:
         await asyncio.sleep(SECONDS_PER_MINUTE)  # over the per-minute quota: wait for the next minute
 
 
-async def save_cell_files(geohash: str, layers: dict) -> None:
+async def save_cell_files(geohash: str, layers: dict, saved: set[str]) -> None:
+    """Downloads and stores the twelve monthly files, skipping those in `saved` (kept from an earlier attempt)
+    and adding each one that lands, so a retry only fetches what failed."""
     urls = {f"month_{month:02d}.tif": url for month, url in enumerate(layers["hourlyShadeUrls"], start=1)}
-    contents = await gather_all(*(download_layer(url) for url in urls.values()))
-    for name, content in zip(urls, contents, strict=True):
+
+    async def save_one(name: str, url: str) -> None:
+        content = await download_layer(url)
         await asyncio.to_thread(save_file, f"shade/{geohash}/{name}", content)
+        saved.add(name)
+
+    await gather_all(*(save_one(name, url) for name, url in urls.items() if name not in saved))
 
 
-async def download_cell(geohash: str, lat: float, lng: float) -> bool:
-    """Fetches one cell. Returns True when Google has no data there."""
-    if not await reserve_solar_call(settings.solar_monthly_call_budget):
-        await set_cell_status(geohash, "BUDGET_EXCEEDED")
+class CellAttempt:
+    """What one cell's attempts have got so far, so a retry repeats only the part that failed:
+    the dataLayers call (one paid Solar call) is made again only if it never answered."""
+
+    def __init__(self, geohash: str, lat: float, lng: float) -> None:
+        self.geohash, self.lat, self.lng = geohash, lat, lng
+        self.layers: dict | None = None
+        self.saved: set[str] = set()
+
+    async def run(self) -> bool:
+        """True when Google has no data there, False when done or out of budget."""
+        if self.layers is None:
+            if not await reserve_solar_call(settings.solar_monthly_call_budget):
+                await set_cell_status(self.geohash, "BUDGET_EXCEEDED")
+                return False
+            self.layers = await get_data_layers(self.lat, self.lng)
+            if self.layers is None:
+                await set_cell_status(self.geohash, "NO_DATA")
+                return True
+        await save_cell_files(self.geohash, self.layers, self.saved)
+        imagery = self.layers["imageryDate"]
+        quality = self.layers.get("imageryQuality") if self.layers.get("imageryQuality") in QUALITIES else None
+        await mark_cell_ready(
+            self.geohash, date(imagery["year"], imagery["month"], imagery["day"]), quality, f"shade/{self.geohash}/"
+        )
         return False
-    layers = await get_data_layers(lat, lng)
-    if layers is None:
-        await set_cell_status(geohash, "NO_DATA")
-        return True
-    await save_cell_files(geohash, layers)
-    imagery = layers["imageryDate"]
-    quality = layers.get("imageryQuality") if layers.get("imageryQuality") in QUALITIES else None
-    await mark_cell_ready(
-        geohash, date(imagery["year"], imagery["month"], imagery["day"]), quality, f"shade/{geohash}/"
-    )
-    return False
 
 
 async def fetch_cell(geohash: str) -> bool:
     center = await claim_cell(geohash)
     if center is None:
         return False
+    cell = CellAttempt(geohash, center["lat"], center["lng"])
     for attempt in range(1, MAX_ATTEMPTS + 1):
         try:
-            return await download_cell(geohash, center["lat"], center["lng"])
+            return await cell.run()
         except (httpx.HTTPError, OSError, KeyError) as error:
             logger.warning("Cell %s attempt %d failed: %s", geohash, attempt, describe_error(error))
             await record_cell_failure(geohash, describe_error(error), give_up=attempt == MAX_ATTEMPTS)
+            if attempt < MAX_ATTEMPTS:
+                await asyncio.sleep(RETRY_BACKOFF_S * 2 ** (attempt - 1))
     return False
 
 

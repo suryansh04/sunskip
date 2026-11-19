@@ -33,7 +33,8 @@ async def lifespan(app: FastAPI) -> AsyncIterator[None]:
     await close_pool()
 
 
-app = FastAPI(title="SunSkip API", version="1", lifespan=lifespan)
+docs = {} if settings.public_docs else {"docs_url": None, "redoc_url": None, "openapi_url": None}
+app = FastAPI(title="SunSkip API", version="1", lifespan=lifespan, **docs)
 app.middleware("http")(guard_request)
 add_error_handlers(app)
 for router in (

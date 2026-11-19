@@ -120,7 +120,7 @@ async def find_shadiest_path(google_coords: list[Point], start_at: datetime, fee
     start, end = nearest_node(corridor, google_coords[0]), nearest_node(corridor, google_coords[-1])
     if start is None or end is None or start == end:
         return None
-    graph = build_graph(corridor, start_hour.hour, heat_weight(feels_like.get(start_hour)))
+    graph = await asyncio.to_thread(build_graph, corridor, start_hour.hour, heat_weight(feels_like.get(start_hour)))
     chosen = await asyncio.to_thread(choose_nodes, graph, start, end)
     if chosen is None:
         return None
