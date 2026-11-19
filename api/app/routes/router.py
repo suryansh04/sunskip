@@ -15,6 +15,7 @@ from app.contracts.models import (
     PlanResponse,
     WaypointsResponse,
 )
+from app.core.caps import DailyCap
 from app.db.trip_queries import save_choice
 from app.routes.best_time import find_best_time
 from app.routes.places import search_places
@@ -22,12 +23,14 @@ from app.routes.plan import plan_trip, stored_option
 from app.routes.waypoints import load_option, trip_waypoints
 
 router = APIRouter(tags=["routes"])
+plan_cap = DailyCap(settings.plans_per_device_per_day, settings.plans_per_day)
 
 
 @router.post("/routes/plan", response_model=PlanResponse)
 async def plan_route(body: PlanRequest, request: Request) -> PlanResponse | dict:
     if settings.use_fakes:
         return fake_plan()
+    plan_cap.take(request.state.client_hash, request.state.client_ip)
     return await plan_trip(body, request.state.client_hash)
 
 

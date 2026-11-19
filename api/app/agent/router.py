@@ -11,5 +11,5 @@ question_cap = DailyCap(settings.agent_questions_per_device_per_day, settings.ag
 
 @router.post("/agent/chat", response_model=AgentChatResponse)
 async def chat_with_agent(body: AgentChatRequest, request: Request) -> AgentChatResponse:
-    question_cap.take(request.state.client_hash)
+    question_cap.take(request.state.client_hash, request.state.client_ip)
     return await chat(body, request.state.client_hash)
