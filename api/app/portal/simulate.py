@@ -1,6 +1,7 @@
 """What-if shade from virtual trees and shelters (api.md endpoint 16). An approximation: no trunks, canopy gaps or
 growth time."""
 
+import asyncio
 import math
 from dataclasses import dataclass
 from datetime import datetime
@@ -19,7 +20,7 @@ from app.core.formulas import round_half_up, round_whole
 from app.core.geo import Point, sample_line, to_local_m
 from app.core.sun import sun_positions
 from app.db.portal_queries import load_segments_near
-from app.shade.queue import ensure_shade
+from app.shade.queue import PORTAL_CLIENT, ensure_shade
 from app.shade.tiles import NO_DATA, SHADE, SUN, sun_bits
 
 SECONDS_PER_MINUTE = 60
@@ -79,6 +80,22 @@ def sun_share(bits: np.ndarray) -> float | None:
     return float((bits[with_data] == SUN).mean()) if with_data.any() else None
 
 
+def cast_item_shadows(
+    before: np.ndarray, points: list, month: int, hours: tuple[int, int], items: list[SimulatedItem], origin: Point
+) -> tuple[np.ndarray, list[dict], list[int]]:
+    """Sun bits with the items' shadows added, the shade share before and after for each hour, and those hours."""
+    after = before.copy()
+    xs, ys = np.array([to_local_m(point, origin) for point in points]).T
+    by_hour, hour_columns = [], []
+    for hour, elevation, azimuth in sun_by_hour(month, hours, origin):
+        shadow = shapely.union_all([shadow_shape(item, elevation, azimuth, origin) for item in items])
+        shaded = shapely.contains_xy(shadow, xs, ys)
+        after[shaded & (before[:, hour] == SUN), hour] = SHADE
+        hour_columns.append(hour)
+        by_hour.append({"hour": hour, "before": shade_pct(before[:, hour]), "after": shade_pct(after[:, hour])})
+    return after, by_hour, hour_columns
+
+
 async def simulate(month: int, hours: tuple[int, int], items: list[SimulatedItem]) -> Simulation | None:
     """None when no shade-ready path is near the items."""
     item_points = [(item.location.lng, item.location.lat) for item in items]
@@ -90,16 +107,10 @@ async def simulate(month: int, hours: tuple[int, int], items: list[SimulatedItem
     ]
     points = [point for segment_points in samples for point in segment_points]
     before = await sun_bits(points, month)
-    after = before.copy()
-    origin = item_points[0]
-    xs, ys = np.array([to_local_m(point, origin) for point in points]).T
-    by_hour, hour_columns = [], []
-    for hour, elevation, azimuth in sun_by_hour(month, hours, origin):
-        shadow = shapely.union_all([shadow_shape(item, elevation, azimuth, origin) for item in items])
-        shaded = shapely.contains_xy(shadow, xs, ys)
-        after[shaded & (before[:, hour] == SUN), hour] = SHADE
-        hour_columns.append(hour)
-        by_hour.append({"hour": hour, "before": shade_pct(before[:, hour]), "after": shade_pct(after[:, hour])})
+    # Shadow geometry for every hour is CPU-bound: run it off the event loop so other requests keep moving
+    after, by_hour, hour_columns = await asyncio.to_thread(
+        cast_item_shadows, before, points, month, hours, items, item_points[0]
+    )
     segments, start = [], 0
     for row, segment_points in zip(rows, samples, strict=True):
         part = slice(start, start + len(segment_points))
@@ -145,7 +156,7 @@ async def simulate_report(request: SimulateRequest) -> dict:
     """The endpoint's answer. Queues shade near the items if missing; 409 while it's on the way, 422 if none."""
     points = [[item.location.lng, item.location.lat] for item in request.items]
     shade = await ensure_shade(
-        {"type": "MultiPoint", "coordinates": points}, settings.simulation_reach_m, "PORTAL", None
+        {"type": "MultiPoint", "coordinates": points}, settings.simulation_reach_m, "PORTAL", PORTAL_CLIENT
     )
     simulation = await simulate(request.month, request.hours, request.items)
     if simulation is None and shade.status == "PREPARING":

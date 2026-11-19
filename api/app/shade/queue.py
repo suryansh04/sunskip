@@ -15,6 +15,7 @@ from app.db.status_queries import get_solar_calls_this_month
 INDIA_BBOX = (68.1, 6.5, 97.5, 35.7)  # west, south, east, north; a rough box around India
 IN_PROGRESS = {"PENDING", "FETCHING"}
 DONE = {"READY", "NO_DATA"}  # cells we never need to fetch again
+PORTAL_CLIENT = "portal"  # every portal request queues under this one shared client
 
 
 def preparing(job_id: str, cells_total: int, cells_done: int) -> Shade:
@@ -29,12 +30,18 @@ def preparing(job_id: str, cells_total: int, cells_done: int) -> Shade:
 
 async def cells_allowed(client_hash: str | None) -> int:
     """How many new cells this request may queue: none once the month's Solar budget is used,
-    and a device only gets what's left of its daily allowance."""
+    and a device (or the portal, as one shared client) only gets what's left of its daily allowance.
+    `None` is for internal callers such as preload scripts."""
     if await get_solar_calls_this_month() >= settings.solar_monthly_call_budget:
         return 0
     if client_hash is None:
         return settings.max_cells_per_job
-    left_today = settings.max_new_cells_per_client_per_day - await count_client_cells_today(client_hash)
+    daily = (
+        settings.max_new_cells_portal_per_day
+        if client_hash == PORTAL_CLIENT
+        else settings.max_new_cells_per_client_per_day
+    )
+    left_today = daily - await count_client_cells_today(client_hash)
     return max(0, min(settings.max_cells_per_job, left_today))
 
 

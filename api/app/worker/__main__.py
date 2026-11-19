@@ -9,6 +9,7 @@ from app.worker.demand import run_demand_nightly
 from app.worker.job import run_job
 
 logger = logging.getLogger("worker")
+MAX_BACKOFF_S = 60
 
 
 async def beat_forever() -> None:
@@ -26,12 +27,20 @@ async def run_worker() -> None:
     # Kept in a list so the background tasks aren't garbage-collected
     background = [asyncio.create_task(beat_forever()), asyncio.create_task(run_demand_nightly())]
     logger.info("Worker started")
+    failures = 0
     while not any(task.done() for task in background):
-        job = await claim_next_job()
-        if job is None:
-            await asyncio.sleep(settings.worker_idle_sleep_s)
-            continue
-        await run_job(job)
+        try:
+            job = await claim_next_job()
+            if job is None:
+                await asyncio.sleep(settings.worker_idle_sleep_s)
+            else:
+                await run_job(job)
+            failures = 0
+        except Exception:
+            # A database blip shouldn't kill the worker: back off (up to a minute) and try again
+            failures += 1
+            logger.exception("Worker loop failed (%d in a row)", failures)
+            await asyncio.sleep(min(MAX_BACKOFF_S, 2**failures))
 
 
 if __name__ == "__main__":

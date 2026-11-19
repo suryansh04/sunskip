@@ -68,6 +68,7 @@ class Settings(BaseSettings):
     corridor_buffer_m: float = 100
     max_cells_per_job: int = 120
     max_new_cells_per_client_per_day: int = 60
+    max_new_cells_portal_per_day: int = 240  # shared by every signed-in official (the demo account is public)
     max_shade_map_km2: float = 1
     solar_monthly_call_budget: int = 6500
     worker_solar_concurrency: int = 4
