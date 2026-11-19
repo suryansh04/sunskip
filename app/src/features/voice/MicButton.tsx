@@ -13,6 +13,7 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
   const recorder = useRef(null);
   const clipTimer = useRef(null);
   const closed = useRef(false);
+  const starting = useRef(false); // asking for the mic: a second tap mustn't open a second recorder
   // The host's newest callbacks: a clip is sent long after it started, and the question must go with the
   // chat's language and conversation as they are then, not as they were when the mic was tapped
   const host = useRef(null);
@@ -33,6 +34,8 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
 
   function start() {
     if (!navigator.mediaDevices || !window.MediaRecorder) return host.current.onError("This browser can't record. Type your question instead.");
+    if (starting.current || recorder.current?.state === "recording") return;
+    starting.current = true;
     navigator.mediaDevices
       .getUserMedia({ audio: true })
       .then((stream) => {
@@ -54,7 +57,10 @@ export default function MicButton({ onTranscript, onListening, onError, autoStar
         setListening(true);
         host.current.onListening(true);
       })
-      .catch(() => host.current.onError("The microphone isn't available. Allow it for this site, or type your question."));
+      .catch(() => host.current.onError("The microphone isn't available. Allow it for this site, or type your question."))
+      .finally(() => {
+        starting.current = false;
+      });
   }
 
   function stop() {

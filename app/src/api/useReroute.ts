@@ -31,9 +31,21 @@ export default function useReroute(fix, snap, end, resetKey) {
   latest.current = { fix, snap };
   const timer = useRef(null);
   const lastTry = useRef(0);
+  // Goes up when the walk changes or the page closes, so a plan still on its way for the old walk is dropped
+  const generation = useRef(0);
 
-  useEffect(() => setReroute(null), [resetKey]);
-  useEffect(() => () => clearTimeout(timer.current), []);
+  useEffect(() => {
+    generation.current += 1;
+    setReroute(null);
+    setRerouting(false);
+  }, [resetKey]);
+  useEffect(
+    () => () => {
+      generation.current += 1;
+      clearTimeout(timer.current);
+    },
+    [],
+  );
 
   useEffect(() => {
     if (!isOff(fix, snap, end)) {
@@ -50,19 +62,21 @@ export default function useReroute(fix, snap, end, resetKey) {
     const here = latest.current.fix;
     if (!isOff(here, latest.current.snap, end)) return;
     lastTry.current = Date.now();
+    const asked = generation.current;
+    const stillWanted = () => asked === generation.current;
     setRerouting(true);
     api
       .post("/routes/plan", planRequest(here, end, istIso(now())))
       .then((res) => {
         const option = shadiestWalk(res.data.options);
-        if (!option) return;
+        if (!option || !stillWanted()) return;
         const { tripId } = res.data;
         return api.get(`/routes/${tripId}/options/${option.optionId}/waypoints`).then((points) => {
-          if (points.data.waypoints.length > 1) setReroute({ tripId, optionId: option.optionId, points: points.data.waypoints });
+          if (stillWanted() && points.data.waypoints.length > 1) setReroute({ tripId, optionId: option.optionId, points: points.data.waypoints });
         });
       })
       .catch(() => null) // keep guiding on the old path; the next wrong-turn check tries again
-      .finally(() => setRerouting(false));
+      .finally(() => stillWanted() && setRerouting(false));
   }
 
   return { reroute, rerouting };

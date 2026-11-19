@@ -66,14 +66,18 @@ export default function Navigate() {
   const legKey = reroute ? reroute.tripId : planKey;
 
   useEffect(() => {
+    let current = true;
     setLoading(true);
     setFailure(null);
     api
       .get(`/routes/${tripId}/options/${optionId}/waypoints`, { params: leaveAt ? { at: leaveAt } : {} })
-      .then((res) => setWaypoints(res.data.waypoints))
-      .catch((err) => setFailure({ expired: err.response?.status === 404, message: errorMessage(err) }))
-      .finally(() => setLoading(false));
-  }, [tripId, optionId, attempt]);
+      .then((res) => current && setWaypoints(res.data.waypoints))
+      .catch((err) => current && setFailure({ expired: err.response?.status === 404, message: errorMessage(err) }))
+      .finally(() => current && setLoading(false));
+    return () => {
+      current = false;
+    };
+  }, [tripId, optionId, leaveAt, attempt]);
 
   useEffect(() => {
     if (USE_MOCKS) return;
@@ -109,10 +113,14 @@ export default function Navigate() {
     if (points.length < 2) return;
     // The streets show the sun for the same time as the walk's line: the later start, if one was picked
     const shownAt = leaveAt || istIso(now());
+    let current = true; // the previous leg's streets must not land on this one
     api
       .get("/shade/segments", { params: { bbox: bboxAround(points[Math.floor(points.length / 2)].location), month: Number(shownAt.slice(5, 7)), hour: hourOf(shownAt) } })
-      .then((res) => setStreets(res.data))
-      .catch(() => setStreets(null));
+      .then((res) => current && setStreets(res.data))
+      .catch(() => current && setStreets(null));
+    return () => {
+      current = false;
+    };
   }, [legKey]);
 
   function show(nextView, reason = "") {

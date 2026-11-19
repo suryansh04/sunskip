@@ -4,8 +4,10 @@ import { api } from "./client";
 const POLL_MS = 3000;
 const GIVE_UP_MS = 120000;
 
-// TRD §2.5: while shade data is being prepared, poll its job every 3 s. Calls onReady when the
+// TRD §2.5: while shade data is being prepared, poll its job every 3 s. Calls onReady once when the
 // data is in (so the page can ask again) and gives up after 2 min or when the job fails.
+// Each poll waits for the last one to answer, and answers that arrive after the job changed are ignored.
+// Depends on the whole `shade` object, so a reload that returns the same job ID still starts polling again.
 export default function useShadeJob(shade, onReady) {
   const [progress, setProgress] = useState(null);
   const [gaveUp, setGaveUp] = useState(false);
@@ -16,29 +18,38 @@ export default function useShadeJob(shade, onReady) {
     setProgress(null);
     setGaveUp(false);
     if (shade?.status !== "PREPARING" || !shade.jobId) return;
+    let cancelled = false;
+    let timer = null;
     const started = Date.now();
-    const timer = setInterval(() => {
+    const stop = (failed) => {
+      if (failed) setGaveUp(true);
+      cancelled = true;
+    };
+    const poll = () => {
       api
         .get(`/shade/jobs/${shade.jobId}`)
         .then((res) => {
+          if (cancelled) return;
           setProgress(res.data);
           if (res.data.readyToReplan) {
-            clearInterval(timer);
+            stop(false);
             ready.current();
-            return;
-          }
-          if (res.data.status === "FAILED" || Date.now() - started > GIVE_UP_MS) {
-            clearInterval(timer);
-            setGaveUp(true);
+          } else if (res.data.status === "FAILED" || Date.now() - started > GIVE_UP_MS) {
+            stop(true);
+          } else {
+            timer = setTimeout(poll, POLL_MS);
           }
         })
         .catch(() => {
-          clearInterval(timer);
-          setGaveUp(true);
+          if (!cancelled) stop(true);
         });
-    }, POLL_MS);
-    return () => clearInterval(timer);
-  }, [shade?.jobId]);
+    };
+    timer = setTimeout(poll, POLL_MS);
+    return () => {
+      cancelled = true;
+      clearTimeout(timer);
+    };
+  }, [shade]);
 
   return { progress, gaveUp };
 }

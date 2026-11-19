@@ -62,12 +62,12 @@ export default function HeatPain() {
   const [data, setData] = useState(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [waitingJob, setWaitingJob] = useState(null); // 409: nothing in the area is ready yet
+  const [waitingJob, setWaitingJob] = useState(null); // { status, jobId } from a 409: nothing in the area is ready yet
   const [attempt, setAttempt] = useState(0);
   const [hover, setHover] = useState(null);
   const tags = useRef([]);
 
-  const shadeJob = waitingJob ? { status: "PREPARING", jobId: waitingJob } : data?.shade;
+  const shadeJob = waitingJob || data?.shade; // a new object on every 409, so polling restarts even for the same job
   const { progress } = useShadeJob(shadeJob, () => setAttempt((n) => n + 1));
 
   useEffect(() => {
@@ -83,7 +83,7 @@ export default function HeatPain() {
       })
       .catch((err) => {
         if (!current) return;
-        if (err.response?.status === 409) setWaitingJob(err.response.data.error.jobId);
+        if (err.response?.status === 409) setWaitingJob({ status: "PREPARING", jobId: err.response.data.error.jobId });
         else setError(errorMessage(err));
       })
       .finally(() => current && setLoading(false));
