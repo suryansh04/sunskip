@@ -1,3 +1,4 @@
+import { lazy } from "react";
 import { createRoot } from "react-dom/client";
 import { BrowserRouter, Navigate, Route, Routes, useLocation } from "react-router";
 import "./index.css";
@@ -6,11 +7,12 @@ import { isLoggedIn, loginNeeded, signCallsIn } from "./auth";
 import Login from "./pages/Login";
 import Callback from "./pages/Callback";
 import Shell from "./pages/Shell";
-import HeatPain from "./pages/HeatPain";
-import Stretch from "./pages/Stretch";
-import Recommendations from "./pages/Recommendations";
-import Simulate from "./pages/Simulate";
-import Stats from "./pages/Stats";
+// Each signed-in page loads when first opened, so the sign-in page doesn't download them all
+const HeatPain = lazy(() => import("./pages/HeatPain"));
+const Stretch = lazy(() => import("./pages/Stretch"));
+const Recommendations = lazy(() => import("./pages/Recommendations"));
+const Simulate = lazy(() => import("./pages/Simulate"));
+const Stats = lazy(() => import("./pages/Stats"));
 
 if (loginNeeded) signCallsIn(api);
 

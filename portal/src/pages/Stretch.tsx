@@ -67,26 +67,37 @@ export default function Stretch() {
   const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
+    let current = true; // a fast switch to another stretch must not show this one's answer
     setLoading(true);
     setError(null);
+    setPaths(null);
     Promise.all([api.get(`/portal/stretches/${stretchId}`), api.get("/portal/heat-pain", { params: { bbox: area.bbox, ...RANKED } })])
       .then(([stretch, pain]) => {
+        if (!current) return;
         setEvidence(stretch.data);
         setRanking(pain.data.features);
       })
-      .catch((err) => setError({ missing: err.response?.status === 404, message: errorMessage(err) }))
-      .finally(() => setLoading(false));
+      .catch((err) => current && setError({ missing: err.response?.status === 404, message: errorMessage(err) }))
+      .finally(() => current && setLoading(false));
+    return () => {
+      current = false;
+    };
   }, [stretchId, area.key, attempt]);
 
   const rankIndex = (ranking || []).findIndex((feature) => feature.properties.stretchId === stretchId);
   const ranked = rankIndex >= 0 ? ranking[rankIndex] : null;
 
   useEffect(() => {
+    setPaths(null); // never draw the previous stretch's paths around this one
     if (!ranked) return;
+    let current = true;
     api
       .get("/shade/segments", { params: { bbox: boxAround(ranked.geometry), month: RANKED.month, hour: 13 } })
-      .then((res) => setPaths(res.data))
-      .catch(() => setPaths(null));
+      .then((res) => current && setPaths(res.data))
+      .catch(() => current && setPaths(null));
+    return () => {
+      current = false;
+    };
   }, [ranked?.properties.stretchId]);
 
   const backLabel = from === "recs" ? "Trees + shelters" : "Heat pain";

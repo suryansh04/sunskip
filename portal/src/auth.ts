@@ -130,12 +130,30 @@ export function signedInEmail() {
   }
 }
 
-export function logout() {
+const REVOKE_WAIT_MS = 2000;
+
+// Revoke the refresh token at Cognito first, so a copy of it stops working too, then end the hosted-page session.
+// Never waits long: signing out locally matters more than hearing back.
+export async function logout() {
+  const refreshToken = localStorage.getItem("refreshToken");
   forgetTokens();
+  if (refreshToken) {
+    const revoke = fetch(`${DOMAIN}/oauth2/revoke`, {
+      method: "POST",
+      headers: { "Content-Type": "application/x-www-form-urlencoded" },
+      body: new URLSearchParams({ token: refreshToken, client_id: CLIENT_ID }),
+      keepalive: true,
+    }).catch(() => null);
+    await Promise.race([revoke, new Promise((resolve) => setTimeout(resolve, REVOKE_WAIT_MS))]);
+  }
   window.location.assign(`${DOMAIN}/logout?${new URLSearchParams({ client_id: CLIENT_ID, logout_uri: window.location.origin + "/" })}`);
 }
 
-// Every call gets a fresh token; a 401 means the session is over, so sign in again
+let leaving = false;
+
+// Every call gets a fresh token. A 401 means the session is over: go to the sign-in page rather than straight
+// to Cognito, because if the API keeps refusing a token Cognito still accepts, that would bounce forever
+// (and demo users never used the hosted page). Several calls failing at once leave only once.
 export function signCallsIn(api) {
   api.interceptors.request.use(async (config) => {
     const token = await freshToken();
@@ -145,9 +163,13 @@ export function signCallsIn(api) {
   api.interceptors.response.use(
     (res) => res,
     (err) => {
-      if (err.response?.status === 401) {
+      if (err.response?.status === 401 && !leaving) {
         forgetTokens();
-        login();
+        const here = window.location.pathname;
+        if (here !== "/login" && here !== "/callback") {
+          leaving = true;
+          window.location.assign("/login");
+        }
       }
       return Promise.reject(err);
     },

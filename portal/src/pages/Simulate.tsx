@@ -63,15 +63,19 @@ export default function Simulate() {
   live.current = { items, tool, sel, treeKind, shelterKind };
   const growing = useRef(null); // { index, grow } while a new item rises
   const firstLoad = useRef(true);
+  const runId = useRef(0); // the newest run (or area load): older answers are dropped
 
   // The plan to start from: the recommendation that opened the simulator, or this area's best tree plan
   useEffect(() => {
     const given = firstLoad.current && start.rec ? start.rec : null;
     firstLoad.current = false;
+    runId.current += 1; // a run still on its way belongs to the old area
+    let current = true;
     setStatus("loading");
     const recsCall = given ? Promise.resolve(null) : api.get("/portal/recommendations", { params: { bbox: area.bbox, type: "TREE" } });
     Promise.all([recsCall, api.get("/portal/heat-pain", { params: { bbox: area.bbox, month: 5, hours: "10-16", limit: 50 } })])
       .then(([recRes, painRes]) => {
+        if (!current) return;
         const stretches = Object.fromEntries(painRes.data.features.map((feature) => [feature.properties.stretchId, feature]));
         const all = recRes ? recRes.data.recommendations : [];
         const chosen = given || all.find((candidate) => candidate.stretchId === start.stretchId) || all[0] || null;
@@ -86,9 +90,13 @@ export default function Simulate() {
         setStatus("idle");
       })
       .catch((err) => {
+        if (!current) return;
         setErrorText(errorMessage(err));
         setStatus(err.response?.status === 409 ? "preparing" : "error");
       });
+    return () => {
+      current = false;
+    };
   }, [area.key, attempt]);
 
   function draw() {
@@ -179,11 +187,13 @@ export default function Simulate() {
     map.on("mousedown", down);
     map.on("mousemove", move);
     map.on("mouseup", up);
+    window.addEventListener("mouseup", up); // a drag let go over the side panel must end too
     map.on("click", click);
     return () => {
       map.off("mousedown", down);
       map.off("mousemove", move);
       map.off("mouseup", up);
+      window.removeEventListener("mouseup", up);
       map.off("click", click);
       map.getCanvas().style.cursor = "";
       map.dragPan.enable();
@@ -251,12 +261,14 @@ export default function Simulate() {
   }
 
   function run() {
+    const id = ++runId.current;
     setStatus("running");
     setGrown(false);
     setSel(null);
     const box = boxAround(items);
     Promise.all([api.post("/portal/simulate", { month, hours: HOURS, items: items.map(asRequest) }), api.get("/shade/segments", { params: { bbox: box, month, hour: 13 } }).catch(() => null)])
       .then(([sim, segments]) => {
+        if (id !== runId.current) return;
         if (segments) setPaths(Object.fromEntries(segments.data.features.map((feature) => [feature.properties.id, feature.geometry])));
         setResult(sim.data);
         setView("before");
@@ -272,6 +284,7 @@ export default function Simulate() {
         );
       })
       .catch((err) => {
+        if (id !== runId.current) return;
         setErrorText(errorMessage(err));
         const code = err.response?.data?.error?.code;
         setStatus(code === "SHADE_PREPARING" ? "preparing" : code === "NO_SHADE_DATA" ? "noData" : "error");

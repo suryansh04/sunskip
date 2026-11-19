@@ -9,9 +9,44 @@ export interface GpsFix extends LatLng {
 
 export type GpsFailure = 'denied' | 'unavailable' | 'timeout' | 'unsupported'
 
+interface Listener {
+  onFix: (fix: GpsFix) => void
+  onFailure: (failure: GpsFailure) => void
+}
+
+// One high-accuracy watch shared by everyone who asks (the walk screen and the AR view both do),
+// so the phone runs one GPS session instead of two. It starts with the first listener and stops with the last.
+const listeners = new Set<Listener>()
+let sharedWatchId: number | null = null
+let lastFix: GpsFix | null = null
+let lastFailure: GpsFailure | null = null // since the last fix
+
+function startSharedWatch() {
+  sharedWatchId = navigator.geolocation.watchPosition(
+    (position) => {
+      lastFix = {
+        lat: position.coords.latitude,
+        lng: position.coords.longitude,
+        accuracyM: position.coords.accuracy,
+        timestamp: position.timestamp,
+      }
+      lastFailure = null
+      for (const listener of [...listeners]) listener.onFix(lastFix)
+    },
+    (error) => {
+      const failure: GpsFailure =
+        error.code === error.PERMISSION_DENIED ? 'denied' : error.code === error.TIMEOUT ? 'timeout' : 'unavailable'
+      lastFailure = failure
+      for (const listener of [...listeners]) listener.onFailure(failure)
+    },
+    { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_TIMEOUT_MS },
+  )
+}
+
 /**
  * Our own geolocation watch. LocAR's built-in one moves the camera on every raw fix, so we watch
- * here, smooth, and feed the result to LocAR ourselves. Returns a function that stops the watch.
+ * here, smooth, and feed the result to LocAR ourselves. Returns a function that stops listening.
+ * A listener that joins a running watch hears the newest fix (or a refusal) straight away.
  */
 export function watchGps(
   onFix: (fix: GpsFix) => void,
@@ -27,23 +62,27 @@ export function watchGps(
     }
   }
 
-  const watchId = navigator.geolocation.watchPosition(
-    (position) => {
-      onFix({
-        lat: position.coords.latitude,
-        lng: position.coords.longitude,
-        accuracyM: position.coords.accuracy,
-        timestamp: position.timestamp,
-      })
-    },
-    (error) => {
-      if (error.code === error.PERMISSION_DENIED) onFailure('denied')
-      else if (error.code === error.TIMEOUT) onFailure('timeout')
-      else onFailure('unavailable')
-    },
-    { enableHighAccuracy: true, maximumAge: 0, timeout: GPS_TIMEOUT_MS },
-  )
-  return () => navigator.geolocation.clearWatch(watchId)
+  const listener: Listener = { onFix, onFailure }
+  listeners.add(listener)
+  if (sharedWatchId === null) {
+    lastFix = null
+    lastFailure = null
+    startSharedWatch()
+  } else {
+    queueMicrotask(() => {
+      if (!listeners.has(listener)) return
+      // Only a refusal is passed on at once; a timeout is the newcomer's to wait for, as with its own watch
+      if (lastFailure === 'denied') onFailure(lastFailure)
+      else if (lastFix) onFix(lastFix)
+    })
+  }
+  return () => {
+    listeners.delete(listener)
+    if (listeners.size === 0 && sharedWatchId !== null) {
+      navigator.geolocation.clearWatch(sharedWatchId)
+      sharedWatchId = null
+    }
+  }
 }
 
 export interface FixSmoother {

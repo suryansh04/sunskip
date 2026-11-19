@@ -4,7 +4,7 @@ import { api } from "../../api/client";
 import { isLive } from "../../api/live";
 import RoundButton from "../../components/RoundButton";
 import MicButton from "../voice/MicButton";
-import { say } from "../voice/speech";
+import { hush, say } from "../voice/speech";
 import ChatMessage from "./ChatMessage";
 
 const SUGGESTIONS = [
@@ -28,16 +28,24 @@ function failureNote(err) {
 // about (one line saying what the answers use), listen (start by listening) and onClose.
 export default function ChatPanel({ tripId, location, about, listen, onClose }) {
   const [messages, setMessages] = useState([]);
-  const [sessionId, setSessionId] = useState(null);
   const [language, setLanguage] = useState(() => localStorage.getItem("language") || "hi-IN");
   const [text, setText] = useState("");
   const [thinking, setThinking] = useState(false);
   const [listening, setListening] = useState(false);
   const [micLive, setMicLive] = useState(false);
   const end = useRef(null);
+  // Read inside ask(), where state can be a render behind: a voice question lands from the mic's callback
+  const busy = useRef(false);
+  const session = useRef(null);
+  const open = useRef(true);
 
   useEffect(() => {
-    isLive("voice").then(setMicLive);
+    isLive("voice").then((live) => open.current && setMicLive(live));
+    return () => {
+      // Closed mid-answer: say nothing, and stop anything already speaking
+      open.current = false;
+      hush();
+    };
   }, []);
 
   useEffect(() => {
@@ -49,22 +57,29 @@ export default function ChatPanel({ tripId, location, about, listen, onClose }) 
   }
 
   function ask(question, seconds = undefined) {
+    // One question at a time, so each one carries the session the last answer opened
+    if (busy.current) return add({ from: "note", text: "SunSkip is still answering. Ask again once it has." });
     add({ from: "me", text: question, seconds });
     setText("");
     // A long voice question: the API would refuse it, and "ask again" wouldn't help
     if (question.length > MAX_QUESTION_CHARS) return add({ from: "note", text: "That question is too long for SunSkip. Ask it in fewer words." });
+    busy.current = true;
     setThinking(true);
     api
       // Only a spoken question needs its answer voiced straight away; Play voices a typed one on tap
-      .post("/agent/chat", { sessionId, message: question, language, location, tripId, speak: seconds !== undefined })
+      .post("/agent/chat", { sessionId: session.current, message: question, language, location, tripId, speak: seconds !== undefined })
       .then((res) => {
-        setSessionId(res.data.sessionId);
+        if (!open.current) return;
+        session.current = res.data.sessionId;
         add({ from: "agent", ...res.data });
         // A question asked by voice is answered by voice
         if (seconds !== undefined) say(res.data.reply, res.data.replyLanguage, res.data.audioUrl);
       })
-      .catch((err) => add({ from: "note", text: failureNote(err) }))
-      .finally(() => setThinking(false));
+      .catch((err) => open.current && add({ from: "note", text: failureNote(err) }))
+      .finally(() => {
+        busy.current = false;
+        if (open.current) setThinking(false);
+      });
   }
 
   function switchLanguage() {

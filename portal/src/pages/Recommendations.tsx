@@ -60,7 +60,7 @@ export default function Recommendations() {
   const [waitingJob, setWaitingJob] = useState(null);
   const [attempt, setAttempt] = useState(0);
   const [hover, setHover] = useState(null);
-  useShadeJob(waitingJob ? { status: "PREPARING", jobId: waitingJob } : null, () => setAttempt((n) => n + 1));
+  useShadeJob(waitingJob, () => setAttempt((n) => n + 1));
 
   useEffect(() => {
     let current = true;
@@ -76,7 +76,7 @@ export default function Recommendations() {
       })
       .catch((err) => {
         if (!current) return;
-        if (err.response?.status === 409) setWaitingJob(err.response.data.error.jobId);
+        if (err.response?.status === 409) setWaitingJob({ status: "PREPARING", jobId: err.response.data.error.jobId });
         else setError(errorMessage(err));
       })
       .finally(() => current && setLoading(false));
