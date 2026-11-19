@@ -6,6 +6,14 @@ export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
   return {
     plugins: [react(), tailwindcss()],
+    build: {
+      rollupOptions: {
+        output: {
+          // The map library and React change rarely: their own files stay cached across deploys
+          manualChunks: { maplibre: ["maplibre-gl"], react: ["react", "react-dom", "react-router"] },
+        },
+      },
+    },
     server: {
       port: 5174,
       strictPort: true, // Cognito only sends people back to this exact address

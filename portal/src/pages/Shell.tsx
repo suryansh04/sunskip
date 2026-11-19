@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { Outlet, useLocation, useNavigate } from "react-router";
 import { areaByKey } from "../areas";
 import TopBar from "../components/TopBar";
@@ -35,7 +35,10 @@ export default function Shell() {
         <div className={fullPage ? "hidden" : "relative min-w-0"}>
           <MapView center={area.center} zoom={START_ZOOM} onReady={setMap} />
         </div>
-        <Outlet context={{ map, area }} />
+        {/* Pages load on first visit; the map above stays put meanwhile */}
+        <Suspense fallback={null}>
+          <Outlet context={{ map, area }} />
+        </Suspense>
       </main>
     </div>
   );
